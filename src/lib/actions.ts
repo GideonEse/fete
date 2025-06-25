@@ -3,9 +3,9 @@
 import { generateRegistrationPrompt } from '@/ai/flows/generate-registration-prompt';
 import { analyzeAttendanceData } from '@/ai/flows/analyze-attendance-data';
 
-export async function getRegistrationPrompt(memberDescription: string) {
+export async function getRegistrationPrompt(memberType: string) {
   try {
-    const result = await generateRegistrationPrompt({ memberDescription });
+    const result = await generateRegistrationPrompt({ memberType });
     return result;
   } catch (error) {
     console.error('Error generating registration prompt:', error);
@@ -26,8 +26,9 @@ export async function getAttendanceAnalysis(query: string, attendanceData: strin
 export async function registerMemberAction(formData: FormData) {
     const name = formData.get('name');
     const email = formData.get('email');
+    const memberType = formData.get('memberType');
     // In a real app, you would process the facial data and save everything to a database.
-    console.log('Registering new member:', { name, email });
+    console.log('Registering new member:', { name, email, memberType });
 
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network latency
 

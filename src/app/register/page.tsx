@@ -9,9 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { getRegistrationPrompt, registerMemberAction } from '@/lib/actions';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function RegisterPage() {
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
@@ -19,6 +25,7 @@ export default function RegisterPage() {
   const [registrationPrompt, setRegistrationPrompt] = React.useState('');
   const [isGeneratingPrompt, setIsGeneratingPrompt] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [memberType, setMemberType] = React.useState('');
   const formRef = React.useRef<HTMLFormElement>(null);
   const { toast } = useToast();
 
@@ -31,17 +38,16 @@ export default function RegisterPage() {
   };
 
   const handleGeneratePrompt = async () => {
-    const description = formRef.current?.querySelector<HTMLTextAreaElement>('#memberDescription')?.value;
-    if (!description) {
+    if (!memberType) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Please provide a member description to generate a prompt.',
+        description: 'Please select a member type to generate a prompt.',
       });
       return;
     }
     setIsGeneratingPrompt(true);
-    const result = await getRegistrationPrompt(description);
+    const result = await getRegistrationPrompt(memberType);
     setRegistrationPrompt(result.registrationPrompt);
     setIsGeneratingPrompt(false);
   };
@@ -59,6 +65,7 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
+    formData.append('memberType', memberType);
     const result = await registerMemberAction(formData);
     setIsSubmitting(false);
 
@@ -70,6 +77,7 @@ export default function RegisterPage() {
         formRef.current?.reset();
         setCapturedImage(null);
         setRegistrationPrompt('');
+        setMemberType('');
     } else {
         toast({
             variant: "destructive",
@@ -104,8 +112,16 @@ export default function RegisterPage() {
                     <Input id="email" name="email" type="email" placeholder="john.doe@example.com" required />
                   </div>
                    <div>
-                    <Label htmlFor="memberDescription">Member Description</Label>
-                    <Textarea id="memberDescription" name="memberDescription" placeholder="e.g., 'Regular attendee, participates in choir, volunteers for youth events.'" />
+                    <Label htmlFor="memberType">Member Type</Label>
+                    <Select name="memberType" onValueChange={setMemberType} value={memberType}>
+                      <SelectTrigger id="memberType">
+                        <SelectValue placeholder="Select a member type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="student">Student</SelectItem>
+                        <SelectItem value="staff">Staff</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                    <div className="space-y-2">
                     <Button type="button" variant="secondary" onClick={handleGeneratePrompt} disabled={isGeneratingPrompt}>

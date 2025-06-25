@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateRegistrationPromptInputSchema = z.object({
-  memberDescription: z.string().describe('The description of the church member.'),
+  memberType: z.string().describe("The type of the church member (e.g., 'Student', 'Staff')."),
 });
 export type GenerateRegistrationPromptInput = z.infer<typeof GenerateRegistrationPromptInputSchema>;
 
@@ -29,7 +29,7 @@ const prompt = ai.definePrompt({
   name: 'generateRegistrationPromptPrompt',
   input: {schema: GenerateRegistrationPromptInputSchema},
   output: {schema: GenerateRegistrationPromptOutputSchema},
-  prompt: `You are an expert at generating registration prompts for church members based on their descriptions.\n\nGenerate a registration prompt for the following church member description:\n\nDescription: {{{memberDescription}}}`,
+  prompt: `You are an expert at generating registration prompts for church members based on their type.\n\nGenerate a registration prompt for the following church member type:\n\nType: {{{memberType}}}`,
 });
 
 const generateRegistrationPromptFlow = ai.defineFlow(
