@@ -134,7 +134,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => {
     setLoggedInUser(null);
-    router.push('/');
+    router.push('/register');
   };
 
   const startSession = () => {
