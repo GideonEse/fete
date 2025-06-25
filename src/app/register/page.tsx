@@ -150,10 +150,12 @@ export default function RegisterPage() {
                     <Label htmlFor="name">Full Name</Label>
                     <Input id="name" name="name" placeholder="John Doe" required />
                   </div>
-                  <div>
-                    <Label htmlFor="matricNumber">Matric Number</Label>
-                    <Input id="matricNumber" name="matricNumber" type="text" placeholder="e.g., U1234567A or admin" required />
-                  </div>
+                  {memberType !== 'admin' && (
+                    <div>
+                      <Label htmlFor="matricNumber">Matric Number</Label>
+                      <Input id="matricNumber" name="matricNumber" type="text" placeholder="e.g., U1234567A" required />
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="password">Password</Label>
                     <Input id="password" name="password" type="password" required />

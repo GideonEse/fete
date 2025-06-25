@@ -28,7 +28,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     const formData = new FormData(event.currentTarget);
-    const matricNumber = (formData.get('matricNumber') as string)?.toLowerCase();
+    const identifier = (formData.get('identifier') as string)?.toLowerCase();
     const selectedMemberType = formData.get('memberType') as string;
 
     // In a real app, you would authenticate the user here.
@@ -46,27 +46,39 @@ export default function LoginPage() {
     }
 
     const isAdminLogin = selectedMemberType === 'admin';
-    const isMatricAdmin = matricNumber === 'admin';
 
-    if (isAdminLogin && isMatricAdmin) {
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back, Admin! Redirecting...',
-      });
-      router.push('/dashboard');
-    } else if (!isAdminLogin && !isMatricAdmin) {
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back! Redirecting...',
-      });
-      router.push('/member-dashboard');
+    if (isAdminLogin) {
+      // For admins, we check for a specific identifier, e.g., 'admin'
+      if (identifier === 'admin') {
+        toast({
+          title: 'Login Successful',
+          description: 'Welcome back, Admin! Redirecting...',
+        });
+        router.push('/dashboard');
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Login Failed',
+          description: 'Invalid admin credentials.',
+        });
+        setIsLoading(false);
+      }
     } else {
-      toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description: 'There is a mismatch between your role and matric number.',
-      });
-      setIsLoading(false);
+      // For students/staff, any non-admin identifier is fine for this mock.
+      if (identifier && identifier !== 'admin') {
+        toast({
+          title: 'Login Successful',
+          description: 'Welcome back! Redirecting...',
+        });
+        router.push('/member-dashboard');
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Login Failed',
+          description: 'Invalid matric number or role mismatch.',
+        });
+        setIsLoading(false);
+      }
     }
   };
 
@@ -99,8 +111,8 @@ export default function LoginPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="matricNumber">Matric Number</Label>
-              <Input id="matricNumber" name="matricNumber" placeholder="e.g., U1234567A or admin" required />
+              <Label htmlFor="identifier">{memberType === 'admin' ? 'Username' : 'Matric Number'}</Label>
+              <Input id="identifier" name="identifier" placeholder={memberType === 'admin' ? 'admin' : 'e.g., U1234567A'} required />
             </div>
             <div className="space-y-2">
                 <div className="flex items-center">
