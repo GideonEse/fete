@@ -29,6 +29,7 @@ export default function LoginPage() {
 
     const formData = new FormData(event.currentTarget);
     const identifier = (formData.get('identifier') as string)?.toLowerCase();
+    const password = formData.get('password') as string;
     const selectedMemberType = formData.get('memberType') as string;
 
     // In a real app, you would authenticate the user here.
@@ -48,8 +49,8 @@ export default function LoginPage() {
     const isAdminLogin = selectedMemberType === 'admin';
 
     if (isAdminLogin) {
-      // For admins, we check for a specific identifier, e.g., 'admin'
-      if (identifier === 'admin') {
+      // For admins, we check for a specific username and password.
+      if (identifier === 'admin' && password === 'password') {
         toast({
           title: 'Login Successful',
           description: 'Welcome back, Admin! Redirecting...',
@@ -59,13 +60,13 @@ export default function LoginPage() {
         toast({
           variant: 'destructive',
           title: 'Login Failed',
-          description: 'Invalid admin credentials.',
+          description: 'Invalid credentials. Hint: use username "admin" and password "password".',
         });
         setIsLoading(false);
       }
     } else {
-      // For students/staff, any non-admin identifier is fine for this mock.
-      if (identifier && identifier !== 'admin') {
+      // For students/staff, any non-admin identifier and any password is fine for this mock.
+      if (identifier && identifier !== 'admin' && password) {
         toast({
           title: 'Login Successful',
           description: 'Welcome back! Redirecting...',
@@ -75,7 +76,7 @@ export default function LoginPage() {
         toast({
           variant: 'destructive',
           title: 'Login Failed',
-          description: 'Invalid matric number or role mismatch.',
+          description: 'Invalid credentials or role mismatch.',
         });
         setIsLoading(false);
       }
