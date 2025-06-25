@@ -33,6 +33,7 @@ interface AppContextType {
   login: (identifier: string, password: string, memberType: string) => { success: boolean, message: string };
   logout: () => void;
   currentSession: Session | null;
+  sessionHistory: Session[];
   startSession: () => void;
   stopSession: () => void;
   addAttendee: (memberId: string) => void;
@@ -45,6 +46,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [loggedInUser, setLoggedInUser] = useState<Member | null>(null);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [sessionHistory, setSessionHistory] = useState<Session[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
   
@@ -53,6 +55,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       const storedMembers = localStorage.getItem('veriattend_members');
       const storedUser = localStorage.getItem('veriattend_loggedInUser');
+      const storedSession = localStorage.getItem('veriattend_currentSession');
+      const storedHistory = localStorage.getItem('veriattend_sessionHistory');
       
       let initialMembers: Member[] = storedMembers ? JSON.parse(storedMembers) : [];
       // Ensure there's always an admin user for the demo
@@ -67,9 +71,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       setMembers(initialMembers);
 
-      if (storedUser) {
-        setLoggedInUser(JSON.parse(storedUser));
-      }
+      if (storedUser) setLoggedInUser(JSON.parse(storedUser));
+      if (storedSession) setCurrentSession(JSON.parse(storedSession));
+      if (storedHistory) setSessionHistory(JSON.parse(storedHistory));
+
     } catch (error) {
         console.error("Failed to parse localStorage data", error);
         // If parsing fails, start fresh
@@ -81,6 +86,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               avatar: `https://placehold.co/100x100.png`
           }]);
         setLoggedInUser(null);
+        setCurrentSession(null);
+        setSessionHistory([]);
     }
     setIsInitialized(true);
   }, []);
@@ -94,8 +101,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         } else {
             localStorage.removeItem('veriattend_loggedInUser');
         }
+        if (currentSession) {
+            localStorage.setItem('veriattend_currentSession', JSON.stringify(currentSession));
+        } else {
+            localStorage.removeItem('veriattend_currentSession');
+        }
+        localStorage.setItem('veriattend_sessionHistory', JSON.stringify(sessionHistory));
     }
-  }, [members, loggedInUser, isInitialized]);
+  }, [members, loggedInUser, currentSession, sessionHistory, isInitialized]);
 
   const addMember = (memberData: Omit<Member, 'id' | 'avatar'>) => {
     if (memberData.memberType !== 'admin') {
@@ -148,7 +161,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const stopSession = () => {
     if (currentSession) {
-      setCurrentSession({ ...currentSession, isActive: false });
+      const finishedSession = { ...currentSession, isActive: false };
+      setSessionHistory(prev => [finishedSession, ...prev]);
+      setCurrentSession(null);
     }
   };
   
@@ -175,7 +190,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AppContext.Provider value={{ members, addMember, loggedInUser, login, logout, currentSession, startSession, stopSession, addAttendee, isInitialized }}>
+    <AppContext.Provider value={{ members, addMember, loggedInUser, login, logout, currentSession, sessionHistory, startSession, stopSession, addAttendee, isInitialized }}>
       {children}
     </AppContext.Provider>
   );

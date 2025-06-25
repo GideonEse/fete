@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { format } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,24 +11,42 @@ import { Check, Loader2, X } from 'lucide-react';
 import MemberAppLayout from '@/components/MemberAppLayout';
 import { useApp } from '@/context/AppContext';
 
-// Mock data for history as we don't store it yet.
-const recentSessions = [
-    { date: '2024-07-21', status: 'Present', time: '9:03 AM', remark: 'On-time' },
-    { date: '2024-07-14', status: 'Present', time: '9:20 AM', remark: 'Late' },
-    { date: '2024-07-07', status: 'Absent', time: '-', remark: '-' },
-    { date: '2024-06-30', status: 'Present', time: '8:59 AM', remark: 'On-time' },
-    { date: '2024-06-23', status: 'Present', time: '9:05 AM', remark: 'On-time' },
-];
-
-const attendanceStats = {
-  attendanceRate: 85,
-  totalPresent: 17,
-  totalAbsent: 3,
-};
-
-
 export default function MemberDashboardPage() {
-    const { loggedInUser, isInitialized } = useApp();
+    const { loggedInUser, sessionHistory, isInitialized } = useApp();
+
+    const { attendanceHistory, attendanceStats } = React.useMemo(() => {
+        if (!loggedInUser || !sessionHistory) {
+            return { attendanceHistory: [], attendanceStats: { attendanceRate: 0, totalPresent: 0, totalAbsent: 0 } };
+        }
+
+        const history = sessionHistory.map(session => {
+            const attendeeInfo = session.attendees.find(a => a.id === loggedInUser.id);
+            return {
+                session,
+                attendeeInfo,
+            };
+        });
+
+        const userAttendanceHistory = history.map(({ session, attendeeInfo }) => ({
+            date: format(new Date(session.startTime), 'yyyy-MM-dd'),
+            status: attendeeInfo ? 'Present' : 'Absent',
+            time: attendeeInfo ? attendeeInfo.time : '-',
+            remark: attendeeInfo ? attendeeInfo.status : '-',
+        })).slice(0, 5);
+
+        const totalSessions = sessionHistory.length;
+        const totalPresent = history.filter(h => !!h.attendeeInfo).length;
+        const totalAbsent = totalSessions - totalPresent;
+        const attendanceRate = totalSessions > 0 ? Math.round((totalPresent / totalSessions) * 100) : 0;
+        
+        const stats = {
+            attendanceRate,
+            totalPresent,
+            totalAbsent,
+        };
+
+        return { attendanceHistory: userAttendanceHistory, attendanceStats: stats };
+    }, [loggedInUser, sessionHistory]);
 
     if (!isInitialized || !loggedInUser) {
         return (
@@ -90,7 +109,7 @@ export default function MemberDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Attendance History</CardTitle>
-            <CardDescription>Your last 5 attendance records. (Static demo data)</CardDescription>
+            <CardDescription>Your last 5 attendance records.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -103,22 +122,30 @@ export default function MemberDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentSessions.map((session, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{session.date}</TableCell>
-                    <TableCell>
-                      <Badge variant={session.status === 'Present' ? 'secondary' : 'destructive'}>
-                        {session.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{session.time}</TableCell>
-                    <TableCell>
-                      <span className={session.remark === 'Late' ? 'font-semibold text-accent' : 'text-muted-foreground'}>
-                        {session.remark}
-                      </span>
+                {attendanceHistory.length > 0 ? (
+                  attendanceHistory.map((session, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{session.date}</TableCell>
+                      <TableCell>
+                        <Badge variant={session.status === 'Present' ? 'secondary' : 'destructive'}>
+                          {session.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{session.time}</TableCell>
+                      <TableCell>
+                        <span className={session.remark === 'Late' ? 'font-semibold text-accent' : 'text-muted-foreground'}>
+                          {session.remark}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      No attendance history found.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>
