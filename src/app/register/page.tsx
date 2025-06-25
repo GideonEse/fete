@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 export default function RegisterPage() {
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
@@ -168,24 +169,33 @@ export default function RegisterPage() {
                         <p className="mt-2">Capturing...</p>
                       </div>
                     )}
-                    {capturedImage ? (
+
+                    {/* Show the image if it's captured */}
+                    {capturedImage && (
                       <Image src={capturedImage} alt="Captured face" layout="fill" objectFit="cover" data-ai-hint="person portrait" />
-                    ) : (
-                       <>
-                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                         {!hasCameraPermission && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
-                                <Camera className="h-12 w-12 mx-auto" />
-                                <p className="mt-2">Camera preview will appear here.</p>
-                                <Alert variant="destructive" className="mt-4">
-                                    <AlertTitle>Camera Access Required</AlertTitle>
-                                    <AlertDescription>
-                                        Please allow camera access to use this feature.
-                                    </AlertDescription>
-                                </Alert>
-                            </div>
-                        )}
-                       </>
+                    )}
+                    
+                    {/* Show the video feed if no image is captured */}
+                    <video 
+                        ref={videoRef} 
+                        className={cn("w-full h-full object-cover", { 'hidden': capturedImage })}
+                        autoPlay
+                        muted 
+                        playsInline 
+                    />
+
+                    {/* Show the no permission alert if no image is captured and there's no permission */}
+                    {!capturedImage && !hasCameraPermission && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
+                            <Camera className="h-12 w-12 mx-auto" />
+                            <p className="mt-2">Camera preview will appear here.</p>
+                            <Alert variant="destructive" className="mt-4">
+                                <AlertTitle>Camera Access Required</AlertTitle>
+                                <AlertDescription>
+                                    Please allow camera access to use this feature.
+                                </AlertDescription>
+                            </Alert>
+                        </div>
                     )}
                   </div>
                   <Button type="button" onClick={capturedImage ? () => setCapturedImage(null) : handleCapture} className="w-full" disabled={isCapturing || !hasCameraPermission}>
