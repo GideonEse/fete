@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Camera, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { registerMemberAction } from '@/lib/actions';
 import {
   Select,
   SelectContent,
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { useApp } from '@/context/AppContext';
 
 export default function RegisterPage() {
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
@@ -30,15 +31,18 @@ export default function RegisterPage() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
   const { toast } = useToast();
+  const { addMember } = useApp();
+  const router = useRouter();
+
 
   React.useEffect(() => {
     if (memberType === 'admin') {
-      // No need for camera for admin
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
         videoRef.current.srcObject = null;
       }
+      setHasCameraPermission(false);
       return;
     }
 
@@ -108,13 +112,28 @@ export default function RegisterPage() {
         });
         return;
     }
-
+    
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
-    if(capturedImage) {
-      formData.append('facialImage', capturedImage);
+    const name = formData.get('name') as string;
+    const matricNumber = formData.get('matricNumber') as string;
+    const password = formData.get('password') as string;
+    const currentMemberType = formData.get('memberType') as 'student' | 'staff' | 'admin';
+
+    const memberData: any = {
+        name,
+        password,
+        memberType: currentMemberType,
+    };
+
+    if (currentMemberType !== 'admin') {
+        memberData.matricNumber = matricNumber;
+        memberData.facialImage = capturedImage;
     }
-    const result = await registerMemberAction(formData);
+
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate async
+    const result = addMember(memberData);
+
     setIsSubmitting(false);
 
     if (result.success) {
@@ -122,14 +141,12 @@ export default function RegisterPage() {
             title: "Registration Successful",
             description: result.message,
         });
-        formRef.current?.reset();
-        setCapturedImage(null);
-        setMemberType('');
+        router.push('/');
     } else {
         toast({
             variant: "destructive",
             title: "Registration Failed",
-            description: "An unexpected error occurred.",
+            description: result.message,
         });
     }
   };
@@ -147,8 +164,8 @@ export default function RegisterPage() {
               <div className={cn("grid grid-cols-1 gap-8", memberType !== 'admin' && "md:grid-cols-2")}>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" name="name" placeholder="John Doe" required />
+                    <Label htmlFor="name">{memberType === 'admin' ? 'Username' : 'Full Name'}</Label>
+                    <Input id="name" name="name" placeholder={memberType === 'admin' ? 'admin' : 'John Doe'} required />
                   </div>
                   {memberType !== 'admin' && (
                     <div>
@@ -184,17 +201,19 @@ export default function RegisterPage() {
                           <p className="mt-2">Capturing...</p>
                         </div>
                       )}
-                      {capturedImage && (
-                        <Image src={capturedImage} alt="Captured face" layout="fill" objectFit="cover" data-ai-hint="person portrait" />
-                      )}
+                      
                       <video 
                           ref={videoRef} 
-                          className={cn("w-full h-full object-cover", { 'hidden': capturedImage })}
+                          className={cn("w-full h-full object-cover", { 'hidden': !!capturedImage })}
                           autoPlay
                           muted 
                           playsInline 
                       />
-                      {!capturedImage && !hasCameraPermission && (
+                       {capturedImage && (
+                        <Image src={capturedImage} alt="Captured face" layout="fill" objectFit="cover" data-ai-hint="person portrait" />
+                      )}
+
+                      {!hasCameraPermission && !capturedImage && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
                               <Camera className="h-12 w-12 mx-auto" />
                               <p className="mt-2">Camera preview will appear here.</p>

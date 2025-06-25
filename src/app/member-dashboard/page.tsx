@@ -6,37 +6,50 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { Check, X } from 'lucide-react';
+import { Check, Loader2, X } from 'lucide-react';
 import MemberAppLayout from '@/components/MemberAppLayout';
+import { useApp } from '@/context/AppContext';
 
-const memberData = {
-  name: 'Marcus Thorne',
-  matricNumber: 'U1234567S',
-  avatar: 'https://placehold.co/100x100.png',
-  attendanceRate: 85,
-  totalPresent: 17,
-  totalAbsent: 3,
-  recentSessions: [
+// Mock data for history as we don't store it yet.
+const recentSessions = [
     { date: '2024-07-21', status: 'Present', time: '9:03 AM', remark: 'On-time' },
     { date: '2024-07-14', status: 'Present', time: '9:20 AM', remark: 'Late' },
     { date: '2024-07-07', status: 'Absent', time: '-', remark: '-' },
     { date: '2024-06-30', status: 'Present', time: '8:59 AM', remark: 'On-time' },
     { date: '2024-06-23', status: 'Present', time: '9:05 AM', remark: 'On-time' },
-  ],
+];
+
+const attendanceStats = {
+  attendanceRate: 85,
+  totalPresent: 17,
+  totalAbsent: 3,
 };
 
+
 export default function MemberDashboardPage() {
+    const { loggedInUser, isInitialized } = useApp();
+
+    if (!isInitialized || !loggedInUser) {
+        return (
+          <MemberAppLayout>
+            <div className="flex flex-1 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          </MemberAppLayout>
+        );
+    }
+
   return (
     <MemberAppLayout>
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <Avatar className="h-20 w-20 border-2 border-primary">
-            <AvatarImage src={memberData.avatar} alt={memberData.name} data-ai-hint="person portrait" />
-            <AvatarFallback>{memberData.name.charAt(0)}</AvatarFallback>
+            <AvatarImage src={loggedInUser.avatar} alt={loggedInUser.name} data-ai-hint="person portrait" />
+            <AvatarFallback>{loggedInUser.name.charAt(0)}</AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-3xl font-bold font-headline">{memberData.name}</h1>
-            <p className="text-muted-foreground">{memberData.matricNumber}</p>
+            <h1 className="text-3xl font-bold font-headline">{loggedInUser.name}</h1>
+            <p className="text-muted-foreground">{loggedInUser.matricNumber}</p>
           </div>
         </div>
 
@@ -46,8 +59,8 @@ export default function MemberDashboardPage() {
               <CardTitle>Attendance Rate</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{memberData.attendanceRate}%</div>
-              <Progress value={memberData.attendanceRate} className="mt-2" />
+              <div className="text-4xl font-bold">{attendanceStats.attendanceRate}%</div>
+              <Progress value={attendanceStats.attendanceRate} className="mt-2" />
             </CardContent>
           </Card>
           <Card>
@@ -57,7 +70,7 @@ export default function MemberDashboardPage() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <Check className="h-8 w-8 text-primary" />
-                <span className="text-4xl font-bold">{memberData.totalPresent}</span>
+                <span className="text-4xl font-bold">{attendanceStats.totalPresent}</span>
               </div>
             </CardContent>
           </Card>
@@ -68,7 +81,7 @@ export default function MemberDashboardPage() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <X className="h-8 w-8 text-destructive" />
-                <span className="text-4xl font-bold">{memberData.totalAbsent}</span>
+                <span className="text-4xl font-bold">{attendanceStats.totalAbsent}</span>
               </div>
             </CardContent>
           </Card>
@@ -77,7 +90,7 @@ export default function MemberDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Attendance History</CardTitle>
-            <CardDescription>Your last 5 attendance records.</CardDescription>
+            <CardDescription>Your last 5 attendance records. (Static demo data)</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -90,7 +103,7 @@ export default function MemberDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {memberData.recentSessions.map((session, index) => (
+                {recentSessions.map((session, index) => (
                   <TableRow key={index}>
                     <TableCell>{session.date}</TableCell>
                     <TableCell>

@@ -2,20 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { LogOut, Users } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 
 interface MemberAppLayoutProps {
   children: React.ReactNode;
 }
 
 export default function MemberAppLayout({ children }: MemberAppLayoutProps) {
-  const router = useRouter();
-
-  const handleLogout = () => {
-    // In a real app, you'd clear session/token here
-    router.push('/');
-  };
+  const { logout } = useApp();
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -24,7 +19,7 @@ export default function MemberAppLayout({ children }: MemberAppLayoutProps) {
           <Users className="h-6 w-6 text-primary" />
           <span className="font-bold text-lg font-headline text-primary">VeriAttend</span>
         </Link>
-        <button onClick={handleLogout} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+        <button onClick={logout} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
           <LogOut className="h-5 w-5" />
           <span>Logout</span>
         </button>

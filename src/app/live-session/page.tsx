@@ -1,32 +1,22 @@
 'use client';
 
 import * as React from 'react';
-import { Camera, VideoOff } from 'lucide-react';
+import { Camera, Loader2, VideoOff } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { members } from '@/lib/mock-data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-
-type Attendee = {
-  id: string;
-  name: string;
-  avatar: string;
-  time: string;
-  status: 'On-time' | 'Late';
-};
+import { useApp } from '@/context/AppContext';
 
 export default function LiveSessionPage() {
-  const [liveLog, setLiveLog] = React.useState<Attendee[]>([]);
-  const [isSessionActive, setIsSessionActive] = React.useState(false);
+  const { members, currentSession, startSession, stopSession, addAttendee, isInitialized } = useApp();
   const [hasCameraPermission, setHasCameraPermission] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const intervalRef = React.useRef<NodeJS.Timeout>();
-  const detectedIds = React.useRef(new Set());
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -61,9 +51,40 @@ export default function LiveSessionPage() {
       }
     };
   }, [toast]);
+  
+  // Simulation logic
+  React.useEffect(() => {
+    if (currentSession?.isActive) {
+        intervalRef.current = setInterval(() => {
+            const attendeesIds = new Set(currentSession.attendees.map(a => a.id));
+            const availableMembers = members.filter(m => m.memberType !== 'admin' && !attendeesIds.has(m.id));
+            
+            if (availableMembers.length === 0) {
+                if(intervalRef.current) clearInterval(intervalRef.current);
+                // Optionally stop the session automatically when everyone has been marked.
+                // stopSession(); 
+                return;
+            }
+
+            const randomMember = availableMembers[Math.floor(Math.random() * availableMembers.length)];
+            addAttendee(randomMember.id);
+
+        }, 3000);
+    } else {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+        }
+    }
+    
+    return () => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+        }
+    }
+  }, [currentSession?.isActive, currentSession?.attendees, members, addAttendee]);
 
 
-  const startSession = () => {
+  const handleStartSession = () => {
     if (!hasCameraPermission) {
       toast({
         variant: 'destructive',
@@ -72,47 +93,27 @@ export default function LiveSessionPage() {
       });
       return;
     }
-    setIsSessionActive(true);
-    detectedIds.current.clear();
-    setLiveLog([]);
-    intervalRef.current = setInterval(() => {
-      const availableMembers = members.filter(m => !detectedIds.current.has(m.id));
-      if (availableMembers.length === 0) {
-        if(intervalRef.current) clearInterval(intervalRef.current);
-        setIsSessionActive(false);
-        return;
-      }
-
-      const randomMember = availableMembers[Math.floor(Math.random() * availableMembers.length)];
-      detectedIds.current.add(randomMember.id);
-      
-      const now = new Date();
-      const arrivalTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const isLate = now.getMinutes() > 15;
-
-      const newAttendee: Attendee = {
-        ...randomMember,
-        time: arrivalTime,
-        status: isLate ? 'Late' : 'On-time',
-      };
-
-      setLiveLog(prev => [newAttendee, ...prev]);
-    }, 3000);
+    startSession();
   };
   
-  const stopSession = () => {
-    setIsSessionActive(false);
-    if(intervalRef.current) {
-        clearInterval(intervalRef.current);
-    }
-  };
+  if (!isInitialized) {
+    return (
+      <AppLayout>
+        <div className="flex flex-1 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const isSessionActive = currentSession?.isActive ?? false;
 
   return (
     <AppLayout>
       <div className="flex-1 space-y-4 p-4 sm:p-8 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <h1 className="text-3xl font-bold tracking-tight font-headline">Live Attendance Session</h1>
-          <Button onClick={isSessionActive ? stopSession : startSession} variant={isSessionActive ? 'destructive' : 'default'} disabled={!hasCameraPermission && !isSessionActive}>
+          <Button onClick={isSessionActive ? stopSession : handleStartSession} variant={isSessionActive ? 'destructive' : 'default'} disabled={!hasCameraPermission && !isSessionActive}>
             {isSessionActive ? 'End Session' : 'Start Session'}
           </Button>
         </div>
@@ -155,36 +156,37 @@ export default function LiveSessionPage() {
               <CardTitle>Live Attendance Log</CardTitle>
             </CardHeader>
             <CardContent className="h-[60vh] overflow-y-auto space-y-4">
-              {liveLog.length === 0 && (
+              {!currentSession || currentSession.attendees.length === 0 ? (
                 <div className="text-center text-muted-foreground py-10">
-                    <p>Waiting for attendees...</p>
+                    <p>{isSessionActive ? 'Waiting for attendees...' : 'Session not started.'}</p>
                 </div>
-              )}
-              {liveLog.map((attendee) => (
-                <div
-                  key={attendee.id}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 animate-in fade-in-0 slide-in-from-bottom-5 duration-500"
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={attendee.avatar} alt={attendee.name} />
-                    <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-medium">{attendee.name}</p>
-                    <p className="text-sm text-muted-foreground">{attendee.time}</p>
-                  </div>
-                  <Badge
-                    className={cn(
-                      attendee.status === 'Late'
-                        ? 'bg-orange-100 text-orange-800 border-orange-200'
-                        : 'bg-green-100 text-green-800 border-green-200'
-                    )}
-                    variant="outline"
+              ) : (
+                currentSession.attendees.map((attendee) => (
+                  <div
+                    key={attendee.id}
+                    className="flex items-center gap-4 p-3 rounded-lg bg-secondary/50 animate-in fade-in-0 slide-in-from-bottom-5 duration-500"
                   >
-                    {attendee.status}
-                  </Badge>
-                </div>
-              ))}
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={attendee.avatar} alt={attendee.name} />
+                      <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="font-medium">{attendee.name}</p>
+                      <p className="text-sm text-muted-foreground">{attendee.time}</p>
+                    </div>
+                    <Badge
+                      className={cn(
+                        attendee.status === 'Late'
+                          ? 'bg-orange-100 text-orange-800 border-orange-200'
+                          : 'bg-green-100 text-green-800 border-green-200'
+                      )}
+                      variant="outline"
+                    >
+                      {attendee.status}
+                    </Badge>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

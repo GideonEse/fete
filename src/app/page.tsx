@@ -16,25 +16,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useApp } from '@/context/AppContext';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [memberType, setMemberType] = React.useState('');
   const router = useRouter();
   const { toast } = useToast();
+  const { login, isInitialized } = useApp();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
 
     const formData = new FormData(event.currentTarget);
-    const identifier = (formData.get('identifier') as string)?.toLowerCase();
+    const identifier = (formData.get('identifier') as string);
     const password = formData.get('password') as string;
     const selectedMemberType = formData.get('memberType') as string;
-
-    // In a real app, you would authenticate the user here.
-    // For now, we'll just simulate a successful login and redirect.
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
     if (!selectedMemberType) {
       toast({
@@ -45,43 +43,37 @@ export default function LoginPage() {
       setIsLoading(false);
       return;
     }
+    
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate async
+    const result = login(identifier, password, selectedMemberType);
 
-    const isAdminLogin = selectedMemberType === 'admin';
-
-    if (isAdminLogin) {
-      // For admins, we check for a specific username and password.
-      if (identifier === 'admin' && password === 'password') {
-        toast({
-          title: 'Login Successful',
-          description: 'Welcome back, Admin! Redirecting...',
-        });
+    if (result.success) {
+      toast({
+        title: 'Login Successful',
+        description: 'Welcome back! Redirecting...',
+      });
+      if (selectedMemberType === 'admin') {
         router.push('/dashboard');
       } else {
-        toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description: 'Invalid credentials. Hint: use username "admin" and password "password".',
-        });
-        setIsLoading(false);
+        router.push('/member-dashboard');
       }
     } else {
-      // For students/staff, any non-admin identifier and any password is fine for this mock.
-      if (identifier && identifier !== 'admin' && password) {
-        toast({
-          title: 'Login Successful',
-          description: 'Welcome back! Redirecting...',
-        });
-        router.push('/member-dashboard');
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description: 'Invalid credentials or role mismatch.',
-        });
-        setIsLoading(false);
-      }
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: `${result.message} ${selectedMemberType === 'admin' ? 'Hint: default is username "Admin" and password "password".' : ''}`,
+      });
+      setIsLoading(false);
     }
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -113,7 +105,7 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="identifier">{memberType === 'admin' ? 'Username' : 'Matric Number'}</Label>
-              <Input id="identifier" name="identifier" placeholder={memberType === 'admin' ? 'admin' : 'e.g., U1234567A'} required />
+              <Input id="identifier" name="identifier" placeholder={memberType === 'admin' ? 'Admin' : 'e.g., U1234567A'} required />
             </div>
             <div className="space-y-2">
                 <div className="flex items-center">

@@ -3,7 +3,6 @@
 import * as React from 'react';
 import Link from 'next/link';
 import {
-  Activity,
   BarChart,
   CheckCircle2,
   Clock,
@@ -19,17 +18,48 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/components/AppLayout';
 import { getAttendanceAnalysis } from '@/lib/actions';
-import { recentActivity, attendanceStats, chartData, attendanceDataString } from '@/lib/mock-data';
+import { useApp } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 
+// Chart data can remain mocked for visual representation
+const chartData = [
+  { name: 'Jan', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Feb', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Mar', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Apr', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'May', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Jun', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Jul', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Aug', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Sep', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Oct', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Nov', total: Math.floor(Math.random() * 100) + 50 },
+  { name: 'Dec', total: Math.floor(Math.random() * 100) + 50 },
+].map(item => ({ ...item, total: (item.total / 200) * 100 }));
+
+
 export default function DashboardPage() {
-  const [isServiceActive, setIsServiceActive] = React.useState(false);
+  const { loggedInUser, members, currentSession, isInitialized } = useApp();
   const [analysisResult, setAnalysisResult] = React.useState('');
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
   const { toast } = useToast();
 
   const handleAnalysis = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    const attendanceDataString = currentSession?.attendees
+        .map(a => `${a.name}, ${a.time}`)
+        .join('\n') ?? '';
+    
+    if (!attendanceDataString) {
+        toast({
+            variant: 'destructive',
+            title: 'No Data',
+            description: 'There is no attendance data from the current session to analyze.',
+        });
+        return;
+    }
+
     const formData = new FormData(event.currentTarget);
     const query = formData.get('query') as string;
 
@@ -58,18 +88,33 @@ export default function DashboardPage() {
     }
   };
 
+  if (!isInitialized) {
+    return (
+      <AppLayout>
+        <div className="flex flex-1 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+  
+  const presentCount = currentSession?.attendees?.length ?? 0;
+  const lateCount = currentSession?.attendees?.filter(a => a.status === 'Late').length ?? 0;
+  const totalMembers = members.filter(m => m.memberType !== 'admin').length;
+  const recentActivity = currentSession?.attendees.slice(0, 4) ?? [];
+
   return (
     <AppLayout>
       <div className="flex-1 space-y-4 p-4 sm:p-8 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
-              <AvatarImage src="https://placehold.co/100x100.png" alt="Admin" data-ai-hint="person portrait" />
-              <AvatarFallback>A</AvatarFallback>
+              <AvatarImage src={loggedInUser?.avatar} alt="Admin" data-ai-hint="person portrait" />
+              <AvatarFallback>{loggedInUser?.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div>
               <h1 className="text-3xl font-bold tracking-tight font-headline">Admin Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back, Admin!</p>
+              <p className="text-muted-foreground">Welcome back, {loggedInUser?.name}!</p>
             </div>
           </div>
         </div>
@@ -80,7 +125,7 @@ export default function DashboardPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{attendanceStats.totalMembers}</div>
+              <div className="text-2xl font-bold">{totalMembers}</div>
             </CardContent>
           </Card>
           <Card>
@@ -89,7 +134,7 @@ export default function DashboardPage() {
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{attendanceStats.present}</div>
+              <div className="text-2xl font-bold">{presentCount}</div>
             </CardContent>
           </Card>
           <Card>
@@ -98,7 +143,7 @@ export default function DashboardPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{attendanceStats.late}</div>
+              <div className="text-2xl font-bold">{lateCount}</div>
             </CardContent>
           </Card>
           <Card className="lg:col-span-1 bg-primary text-primary-foreground">
@@ -111,7 +156,7 @@ export default function DashboardPage() {
             <CardContent>
               <Link href="/live-session">
                 <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                  {isServiceActive ? 'View Live Session' : 'Start New Service'}
+                  {currentSession?.isActive ? 'View Live Session' : 'Start New Service'}
                 </Button>
               </Link>
             </CardContent>
@@ -159,6 +204,11 @@ export default function DashboardPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                   {recentActivity.length === 0 && (
+                     <TableRow>
+                        <TableCell colSpan={3} className="text-center text-muted-foreground">No activity yet for this session.</TableCell>
+                     </TableRow>
+                   )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -168,7 +218,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">AI Attendance Analysis</CardTitle>
-            <CardDescription>Ask questions about the attendance data to get insights.</CardDescription>
+            <CardDescription>Ask questions about the current session's attendance data to get insights.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAnalysis} className="space-y-4">
