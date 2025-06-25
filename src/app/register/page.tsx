@@ -31,7 +31,7 @@ export default function RegisterPage() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
   const { toast } = useToast();
-  const { addMember } = useApp();
+  const { addMember, login } = useApp();
   const router = useRouter();
 
 
@@ -134,20 +134,37 @@ export default function RegisterPage() {
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate async
     const result = addMember(memberData);
 
-    setIsSubmitting(false);
-
     if (result.success) {
         toast({
             title: "Registration Successful",
-            description: result.message,
+            description: "Logging you in...",
         });
-        router.push('/');
+
+        const identifier = currentMemberType === 'admin' ? name : matricNumber;
+        const loginResult = login(identifier, password, currentMemberType);
+
+        if (loginResult.success) {
+            if (currentMemberType === 'admin') {
+                router.push('/dashboard');
+            } else {
+                router.push('/member-dashboard');
+            }
+        } else {
+            // This is an unlikely case, but good to handle
+            toast({
+                variant: 'destructive',
+                title: 'Auto-Login Failed',
+                description: 'Please try logging in manually.',
+            });
+            router.push('/');
+        }
     } else {
         toast({
             variant: "destructive",
             title: "Registration Failed",
             description: result.message,
         });
+        setIsSubmitting(false);
     }
   };
 
