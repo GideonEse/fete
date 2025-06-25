@@ -21,28 +21,44 @@ import { getAttendanceAnalysis } from '@/lib/actions';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 
-// Chart data can remain mocked for visual representation
-const chartData = [
-  { name: 'Jan', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Feb', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Mar', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Apr', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'May', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Jun', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Jul', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Aug', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Sep', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Oct', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Nov', total: Math.floor(Math.random() * 100) + 50 },
-  { name: 'Dec', total: Math.floor(Math.random() * 100) + 50 },
-].map(item => ({ ...item, total: (item.total / 200) * 100 }));
-
-
 export default function DashboardPage() {
-  const { loggedInUser, members, currentSession, isInitialized } = useApp();
+  const { loggedInUser, members, currentSession, sessionHistory, isInitialized } = useApp();
   const [analysisResult, setAnalysisResult] = React.useState('');
   const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
   const { toast } = useToast();
+
+  const chartData = React.useMemo(() => {
+    const nonAdminMembers = members.filter(m => m.memberType !== 'admin');
+    const totalMembers = nonAdminMembers.length;
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const defaultChartData = monthNames.map(name => ({ name, total: 0 }));
+
+    if (totalMembers === 0 || sessionHistory.length === 0) {
+        return defaultChartData;
+    }
+    
+    const monthlyAttendance: { [key: number]: number[] } = {};
+    for (let i = 0; i < 12; i++) {
+        monthlyAttendance[i] = [];
+    }
+
+    sessionHistory.forEach(session => {
+        const month = new Date(session.startTime).getMonth();
+        const attendancePercentage = (session.attendees.length / totalMembers) * 100;
+        if (monthlyAttendance[month]) {
+            monthlyAttendance[month].push(attendancePercentage);
+        }
+    });
+
+    return monthNames.map((name, index) => {
+        const monthData = monthlyAttendance[index];
+        const average = monthData.length > 0
+            ? monthData.reduce((a, b) => a + b, 0) / monthData.length
+            : 0;
+        return { name, total: Math.round(average) };
+    });
+  }, [sessionHistory, members]);
 
   const handleAnalysis = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
