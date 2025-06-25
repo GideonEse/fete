@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getRegistrationPrompt, registerMemberAction } from '@/lib/actions';
+import { registerMemberAction } from '@/lib/actions';
 import {
   Select,
   SelectContent,
@@ -18,38 +18,73 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function RegisterPage() {
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
   const [isCapturing, setIsCapturing] = React.useState(false);
-  const [registrationPrompt, setRegistrationPrompt] = React.useState('');
-  const [isGeneratingPrompt, setIsGeneratingPrompt] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [memberType, setMemberType] = React.useState('');
+  const [hasCameraPermission, setHasCameraPermission] = React.useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
   const { toast } = useToast();
 
-  const handleCapture = () => {
-    setIsCapturing(true);
-    setTimeout(() => {
-      setCapturedImage('https://placehold.co/600x400.png');
-      setIsCapturing(false);
-    }, 1500);
-  };
+  React.useEffect(() => {
+    const getCameraPermission = async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('Camera API is not available in this browser.');
+        setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Not Supported',
+          description: 'Your browser does not support camera access.',
+        });
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setHasCameraPermission(true);
 
-  const handleGeneratePrompt = async () => {
-    if (!memberType) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Please select a member type to generate a prompt.',
-      });
-      return;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this app.',
+        });
+      }
+    };
+
+    getCameraPermission();
+    
+    return () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+        }
+    };
+  }, [toast]);
+
+
+  const handleCapture = () => {
+    if (videoRef.current) {
+        setIsCapturing(true);
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+            const dataUri = canvas.toDataURL('image/png');
+            setCapturedImage(dataUri);
+        }
+        setIsCapturing(false);
     }
-    setIsGeneratingPrompt(true);
-    const result = await getRegistrationPrompt(memberType);
-    setRegistrationPrompt(result.registrationPrompt);
-    setIsGeneratingPrompt(false);
   };
   
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -66,6 +101,7 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
     formData.append('memberType', memberType);
+    formData.append('facialImage', capturedImage);
     const result = await registerMemberAction(formData);
     setIsSubmitting(false);
 
@@ -76,7 +112,6 @@ export default function RegisterPage() {
         });
         formRef.current?.reset();
         setCapturedImage(null);
-        setRegistrationPrompt('');
         setMemberType('');
     } else {
         toast({
@@ -113,7 +148,7 @@ export default function RegisterPage() {
                   </div>
                    <div>
                     <Label htmlFor="memberType">Member Type</Label>
-                    <Select name="memberType" onValueChange={setMemberType} value={memberType}>
+                    <Select name="memberType" onValueChange={setMemberType} value={memberType} required>
                       <SelectTrigger id="memberType">
                         <SelectValue placeholder="Select a member type" />
                       </SelectTrigger>
@@ -122,13 +157,6 @@ export default function RegisterPage() {
                         <SelectItem value="staff">Staff</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                   <div className="space-y-2">
-                    <Button type="button" variant="secondary" onClick={handleGeneratePrompt} disabled={isGeneratingPrompt}>
-                      {isGeneratingPrompt && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Generate Welcome Prompt with AI
-                    </Button>
-                    {registrationPrompt && <p className="text-sm text-muted-foreground p-3 bg-muted rounded-md">{registrationPrompt}</p>}
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -143,13 +171,24 @@ export default function RegisterPage() {
                     {capturedImage ? (
                       <Image src={capturedImage} alt="Captured face" layout="fill" objectFit="cover" data-ai-hint="person portrait" />
                     ) : (
-                      <div className="text-center text-muted-foreground">
-                        <Camera className="h-12 w-12 mx-auto" />
-                        <p className="mt-2">Camera preview will appear here</p>
-                      </div>
+                       <>
+                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                         {!hasCameraPermission && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
+                                <Camera className="h-12 w-12 mx-auto" />
+                                <p className="mt-2">Camera preview will appear here.</p>
+                                <Alert variant="destructive" className="mt-4">
+                                    <AlertTitle>Camera Access Required</AlertTitle>
+                                    <AlertDescription>
+                                        Please allow camera access to use this feature.
+                                    </AlertDescription>
+                                </Alert>
+                            </div>
+                        )}
+                       </>
                     )}
                   </div>
-                  <Button type="button" onClick={handleCapture} className="w-full" disabled={isCapturing}>
+                  <Button type="button" onClick={capturedImage ? () => setCapturedImage(null) : handleCapture} className="w-full" disabled={isCapturing || !hasCameraPermission}>
                     <Camera className="mr-2 h-4 w-4" />
                     {capturedImage ? 'Retake Image' : 'Capture Image'}
                   </Button>
