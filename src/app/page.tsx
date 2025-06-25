@@ -9,9 +9,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = React.useState(false);
+  const [memberType, setMemberType] = React.useState('');
   const router = useRouter();
   const { toast } = useToast();
 
@@ -20,21 +28,45 @@ export default function LoginPage() {
     setIsLoading(true);
 
     const formData = new FormData(event.currentTarget);
-    const matricNumber = formData.get('matricNumber') as string;
+    const matricNumber = (formData.get('matricNumber') as string)?.toLowerCase();
+    const selectedMemberType = formData.get('memberType') as string;
 
     // In a real app, you would authenticate the user here.
-    // For now, we'll just simulate a successful login and redirect based on a simple rule.
+    // For now, we'll just simulate a successful login and redirect.
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    toast({
-      title: 'Login Successful',
-      description: 'Welcome back! Redirecting...',
-    });
+    if (!selectedMemberType) {
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: 'Please select a member type.',
+      });
+      setIsLoading(false);
+      return;
+    }
 
-    if (matricNumber.toLowerCase() === 'admin') {
-        router.push('/dashboard');
+    const isAdminLogin = selectedMemberType === 'admin';
+    const isMatricAdmin = matricNumber === 'admin';
+
+    if (isAdminLogin && isMatricAdmin) {
+      toast({
+        title: 'Login Successful',
+        description: 'Welcome back, Admin! Redirecting...',
+      });
+      router.push('/dashboard');
+    } else if (!isAdminLogin && !isMatricAdmin) {
+      toast({
+        title: 'Login Successful',
+        description: 'Welcome back! Redirecting...',
+      });
+      router.push('/member-dashboard');
     } else {
-        router.push('/member-dashboard');
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: 'There is a mismatch between your role and matric number.',
+      });
+      setIsLoading(false);
     }
   };
 
@@ -49,10 +81,23 @@ export default function LoginPage() {
                 </div>
             </div>
           <CardTitle className="text-2xl">Member Login</CardTitle>
-          <CardDescription>Enter your matriculation number. Use 'admin' to access the admin dashboard.</CardDescription>
+          <CardDescription>Please select your role and enter your credentials.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="memberType">I am a...</Label>
+              <Select name="memberType" onValueChange={setMemberType} value={memberType} required>
+                <SelectTrigger id="memberType">
+                  <SelectValue placeholder="Select member type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="student">Student</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="matricNumber">Matric Number</Label>
               <Input id="matricNumber" name="matricNumber" placeholder="e.g., U1234567A or admin" required />
