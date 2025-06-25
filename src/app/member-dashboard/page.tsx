@@ -67,8 +67,17 @@ export default function MemberDashboardPage() {
             <AvatarFallback>{loggedInUser.name.charAt(0)}</AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-3xl font-bold font-headline">{loggedInUser.name}</h1>
-            <p className="text-muted-foreground">{loggedInUser.matricNumber}</p>
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-3xl font-bold font-headline">{loggedInUser.name}</h1>
+              {loggedInUser.memberType !== 'admin' && (
+                <Badge variant="secondary" className="capitalize">
+                  {loggedInUser.memberType}
+                </Badge>
+              )}
+            </div>
+            {loggedInUser.matricNumber && (
+              <p className="text-muted-foreground">{loggedInUser.matricNumber}</p>
+            )}
           </div>
         </div>
 
