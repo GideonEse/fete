@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Camera, Loader2 } from 'lucide-react';
 
-import AppLayout from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -101,8 +101,6 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
-    formData.append('memberType', memberType);
-    formData.append('facialImage', capturedImage);
     const result = await registerMemberAction(formData);
     setIsSubmitting(false);
 
@@ -125,14 +123,10 @@ export default function RegisterPage() {
 
 
   return (
-    <AppLayout>
-      <div className="flex-1 space-y-4 p-4 sm:p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight font-headline">New Member Registration</h1>
-        </div>
-        <Card>
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-3xl">
           <CardHeader>
-            <CardTitle>Member Details</CardTitle>
+            <CardTitle className="text-2xl">New Member Registration</CardTitle>
             <CardDescription>Fill out the form to register a new church member.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -144,8 +138,12 @@ export default function RegisterPage() {
                     <Input id="name" name="name" placeholder="John Doe" required />
                   </div>
                   <div>
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" name="email" type="email" placeholder="john.doe@example.com" required />
+                    <Label htmlFor="matricNumber">Matric Number</Label>
+                    <Input id="matricNumber" name="matricNumber" type="text" placeholder="e.g., U1234567A" required />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input id="password" name="password" type="password" required />
                   </div>
                    <div>
                     <Label htmlFor="memberType">Member Type</Label>
@@ -169,13 +167,9 @@ export default function RegisterPage() {
                         <p className="mt-2">Capturing...</p>
                       </div>
                     )}
-
-                    {/* Show the image if it's captured */}
                     {capturedImage && (
                       <Image src={capturedImage} alt="Captured face" layout="fill" objectFit="cover" data-ai-hint="person portrait" />
                     )}
-                    
-                    {/* Show the video feed if no image is captured */}
                     <video 
                         ref={videoRef} 
                         className={cn("w-full h-full object-cover", { 'hidden': capturedImage })}
@@ -183,8 +177,6 @@ export default function RegisterPage() {
                         muted 
                         playsInline 
                     />
-
-                    {/* Show the no permission alert if no image is captured and there's no permission */}
                     {!capturedImage && !hasCameraPermission && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
                             <Camera className="h-12 w-12 mx-auto" />
@@ -204,7 +196,14 @@ export default function RegisterPage() {
                   </Button>
                 </div>
               </div>
-              <div className="flex justify-end">
+
+              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 pt-4">
+                 <div className="text-sm text-muted-foreground">
+                    Already have an account?{' '}
+                    <Link href="/" className="underline font-medium text-primary">
+                      Login
+                    </Link>
+                  </div>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Register Member
@@ -214,6 +213,5 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
   );
 }

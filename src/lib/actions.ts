@@ -14,12 +14,13 @@ export async function getAttendanceAnalysis(query: string, attendanceData: strin
 
 export async function registerMemberAction(formData: FormData) {
     const name = formData.get('name');
-    const email = formData.get('email');
+    const matricNumber = formData.get('matricNumber');
     const memberType = formData.get('memberType');
     const facialImage = formData.get('facialImage');
+    const password = formData.get('password');
 
     // In a real app, you would process the facial data and save everything to a database.
-    console.log('Registering new member:', { name, email, memberType, hasImage: !!facialImage });
+    console.log('Registering new member:', { name, matricNumber, memberType, hasImage: !!facialImage, password: '***' });
 
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network latency
 
