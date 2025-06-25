@@ -18,9 +18,12 @@ export default function LoginPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
-    
+
+    const formData = new FormData(event.currentTarget);
+    const matricNumber = formData.get('matricNumber') as string;
+
     // In a real app, you would authenticate the user here.
-    // For now, we'll just simulate a successful login and redirect to the dashboard.
+    // For now, we'll just simulate a successful login and redirect based on a simple rule.
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     toast({
@@ -28,7 +31,11 @@ export default function LoginPage() {
       description: 'Welcome back! Redirecting...',
     });
 
-    router.push('/dashboard');
+    if (matricNumber.toLowerCase() === 'admin') {
+        router.push('/dashboard');
+    } else {
+        router.push('/member-dashboard');
+    }
   };
 
   return (
@@ -42,13 +49,13 @@ export default function LoginPage() {
                 </div>
             </div>
           <CardTitle className="text-2xl">Member Login</CardTitle>
-          <CardDescription>Enter your matriculation number and password.</CardDescription>
+          <CardDescription>Enter your matriculation number. Use 'admin' to access the admin dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="matricNumber">Matric Number</Label>
-              <Input id="matricNumber" name="matricNumber" placeholder="e.g., U1234567A" required />
+              <Input id="matricNumber" name="matricNumber" placeholder="e.g., U1234567A or admin" required />
             </div>
             <div className="space-y-2">
                 <div className="flex items-center">
