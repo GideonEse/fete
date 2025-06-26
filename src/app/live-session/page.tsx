@@ -174,14 +174,7 @@ export default function LiveSessionPage() {
                       <p className="font-medium">{attendee.name}</p>
                       <p className="text-sm text-muted-foreground">{attendee.time}</p>
                     </div>
-                    <Badge
-                      className={cn(
-                        attendee.status === 'Late'
-                          ? 'bg-orange-100 text-orange-800 border-orange-200'
-                          : 'bg-green-100 text-green-800 border-green-200'
-                      )}
-                      variant="outline"
-                    >
+                    <Badge variant={attendee.status === 'On-time' ? 'secondary' : 'destructive'}>
                       {attendee.status}
                     </Badge>
                   </div>

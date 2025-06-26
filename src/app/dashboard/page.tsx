@@ -20,6 +20,7 @@ import AppLayout from '@/components/AppLayout';
 import { getAttendanceAnalysis } from '@/lib/actions';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const { loggedInUser, members, currentSession, sessionHistory, isInitialized } = useApp();
@@ -214,9 +215,9 @@ export default function DashboardPage() {
                       <TableCell className="font-medium">{activity.name}</TableCell>
                       <TableCell>{activity.time}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${activity.status === 'On-time' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                        <Badge variant={activity.status === 'On-time' ? 'secondary' : 'destructive'}>
                           {activity.status}
-                        </span>
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -14,7 +14,7 @@ interface AppLayoutProps {
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/', label: 'Register Member', icon: UserPlus },
+  { href: '/register', label: 'Register Member', icon: UserPlus },
   { href: '/live-session', label: 'Live Session', icon: Camera },
 ];
 
