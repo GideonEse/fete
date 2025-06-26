@@ -186,7 +186,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         status: isLate ? 'Late' : 'On-time',
       };
       
-      setCurrentSession(prev => prev ? { ...prev, attendees: [newAttendee, ...prev.attendees].sort((a,b) => b.time.localeCompare(a.time)) } : null);
+      setCurrentSession(prev => prev ? { ...prev, attendees: [newAttendee, ...prev.attendees] } : null);
   };
 
 

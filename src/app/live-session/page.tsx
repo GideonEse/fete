@@ -86,6 +86,8 @@ export default function LiveSessionPage() {
                 description: 'Could not initialize face recognition engine.'
             });
         }
+      } else {
+        faceMatcherRef.current = null;
       }
     }
   }, [members, modelsLoaded, toast]);
@@ -140,6 +142,8 @@ export default function LiveSessionPage() {
 
 
   const handleStartSession = () => {
+    const nonAdminMembersCount = members.filter(m => m.memberType !== 'admin').length;
+
     if (!hasCameraPermission) {
       toast({
         variant: 'destructive',
@@ -156,6 +160,13 @@ export default function LiveSessionPage() {
       });
       return;
     }
+    if (nonAdminMembersCount > 0 && !faceMatcherRef.current) {
+        toast({
+            title: 'FYI: Recognition Not Ready',
+            description: 'No members have registered facial data. Recognition will not be active.',
+        });
+    }
+
     startSession();
   };
   
