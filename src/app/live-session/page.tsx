@@ -85,7 +85,7 @@ export default function LiveSessionPage() {
         try {
           const labeledFaceDescriptors = membersWithDescriptors.map(
             (member) =>
-              new faceapi.LabeledFaceDescriptor(member.id, [new Float32Array(member.faceDescriptor)])
+              new faceapi.LabeledFaceDescriptors(member.id, [new Float32Array(member.faceDescriptor)])
           );
           faceMatcherRef.current = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.5);
         } catch (error) {
