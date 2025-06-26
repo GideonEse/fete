@@ -21,6 +21,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
+import { getFaceDescriptor, loadModels } from '@/lib/face-api';
 
 export default function RegisterPage() {
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
@@ -28,6 +29,7 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [memberType, setMemberType] = React.useState('');
   const [hasCameraPermission, setHasCameraPermission] = React.useState(false);
+  const [modelsLoaded, setModelsLoaded] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
   const { toast } = useToast();
@@ -36,6 +38,11 @@ export default function RegisterPage() {
 
 
   React.useEffect(() => {
+    const initFaceApi = async () => {
+      await loadModels();
+      setModelsLoaded(true);
+    };
+
     if (memberType === 'admin') {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
@@ -45,6 +52,8 @@ export default function RegisterPage() {
       setHasCameraPermission(false);
       return;
     }
+    
+    initFaceApi();
 
     const getCameraPermission = async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -129,9 +138,20 @@ export default function RegisterPage() {
     if (currentMemberType !== 'admin') {
         memberData.matricNumber = matricNumber;
         memberData.facialImage = capturedImage;
+        
+        const descriptor = await getFaceDescriptor(capturedImage!);
+        if (!descriptor) {
+            toast({
+                variant: 'destructive',
+                title: 'Facial Capture Failed',
+                description: 'No face detected in the image. Please retake your photo and try again.',
+            });
+            setIsSubmitting(false);
+            return;
+        }
+        memberData.faceDescriptor = Array.from(descriptor);
     }
 
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate async
     const result = addMember(memberData);
 
     if (result.success) {
@@ -150,7 +170,6 @@ export default function RegisterPage() {
                 router.push('/member-dashboard');
             }
         } else {
-            // This is an unlikely case, but good to handle
             toast({
                 variant: 'destructive',
                 title: 'Auto-Login Failed',
@@ -168,6 +187,7 @@ export default function RegisterPage() {
     }
   };
 
+  const isFacialRegReady = hasCameraPermission && modelsLoaded;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -242,8 +262,14 @@ export default function RegisterPage() {
                               </Alert>
                           </div>
                       )}
+                      {hasCameraPermission && !modelsLoaded && !capturedImage && (
+                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
+                            <Loader2 className="h-12 w-12 mx-auto animate-spin" />
+                            <p className="mt-2">Loading recognition models...</p>
+                        </div>
+                      )}
                     </div>
-                    <Button type="button" onClick={capturedImage ? () => setCapturedImage(null) : handleCapture} className="w-full" disabled={isCapturing || !hasCameraPermission}>
+                    <Button type="button" onClick={capturedImage ? () => setCapturedImage(null) : handleCapture} className="w-full" disabled={isCapturing || !isFacialRegReady}>
                       <Camera className="mr-2 h-4 w-4" />
                       {capturedImage ? 'Retake Image' : 'Capture Image'}
                     </Button>
@@ -258,7 +284,7 @@ export default function RegisterPage() {
                       Login
                     </Link>
                   </div>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || (memberType !== 'admin' && !isFacialRegReady)}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Register Member
                 </Button>

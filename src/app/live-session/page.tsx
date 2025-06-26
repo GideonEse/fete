@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import { Camera, Loader2, VideoOff } from 'lucide-react';
+import * as faceapi from 'face-api.js';
+
 import AppLayout from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,20 +13,26 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useApp } from '@/context/AppContext';
+import type { Member } from '@/context/AppContext';
+import { loadModels } from '@/lib/face-api';
 
 export default function LiveSessionPage() {
   const { members, currentSession, startSession, stopSession, addAttendee, isInitialized } = useApp();
   const [hasCameraPermission, setHasCameraPermission] = React.useState(false);
+  const [modelsLoaded, setModelsLoaded] = React.useState(false);
+  const [isDetecting, setIsDetecting] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const intervalRef = React.useRef<NodeJS.Timeout>();
+  const recognitionIntervalRef = React.useRef<NodeJS.Timeout>();
+  const isDetectingRef = React.useRef(false);
+  const faceMatcherRef = React.useRef<faceapi.FaceMatcher | null>(null);
   const { toast } = useToast();
-
+  
+  // Get camera permission and load models
   React.useEffect(() => {
-    const getCameraPermission = async () => {
+    const setup = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         setHasCameraPermission(true);
-
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -34,54 +42,101 @@ export default function LiveSessionPage() {
         toast({
           variant: 'destructive',
           title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings to use this feature.',
+          description: 'Please enable camera permissions in your browser settings.',
         });
       }
+      
+      await loadModels();
+      setModelsLoaded(true);
     };
 
-    getCameraPermission();
+    setup();
     
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      if (recognitionIntervalRef.current) {
+        clearInterval(recognitionIntervalRef.current);
       }
     };
   }, [toast]);
   
-  // Simulation logic
+  // Create face matcher when models are loaded or members change
   React.useEffect(() => {
-    if (currentSession?.isActive) {
-        intervalRef.current = setInterval(() => {
-            const attendeesIds = new Set(currentSession.attendees.map(a => a.id));
-            const availableMembers = members.filter(m => m.memberType !== 'admin' && !attendeesIds.has(m.id));
-            
-            if (availableMembers.length === 0) {
-                if(intervalRef.current) clearInterval(intervalRef.current);
-                // Optionally stop the session automatically when everyone has been marked.
-                // stopSession(); 
-                return;
-            }
+    if (modelsLoaded && members.length > 0) {
+      const membersWithDescriptors = members.filter(
+        (m): m is Member & { faceDescriptor: number[] } =>
+          m.memberType !== 'admin' && !!m.faceDescriptor && Array.isArray(m.faceDescriptor)
+      );
 
-            const randomMember = availableMembers[Math.floor(Math.random() * availableMembers.length)];
-            addAttendee(randomMember.id);
-
-        }, 3000);
-    } else {
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
+      if (membersWithDescriptors.length > 0) {
+        try {
+          const labeledFaceDescriptors = membersWithDescriptors.map(
+            (member) =>
+              new faceapi.LabeledFaceDescriptor(member.id, [new Float32Array(member.faceDescriptor)])
+          );
+          faceMatcherRef.current = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.5);
+        } catch (error) {
+            console.error("Failed to create FaceMatcher:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Recognition Error',
+                description: 'Could not initialize face recognition engine.'
+            });
         }
+      }
     }
-    
+  }, [members, modelsLoaded, toast]);
+  
+  // Facial recognition loop
+  React.useEffect(() => {
+    if (!currentSession?.isActive) {
+      if (recognitionIntervalRef.current) clearInterval(recognitionIntervalRef.current);
+      return;
+    }
+
+    recognitionIntervalRef.current = setInterval(async () => {
+      if (
+        !hasCameraPermission ||
+        !modelsLoaded ||
+        !videoRef.current ||
+        !faceMatcherRef.current ||
+        isDetectingRef.current
+      ) {
+        return;
+      }
+
+      isDetectingRef.current = true;
+      setIsDetecting(true);
+
+      try {
+        const detections = await faceapi
+          .detectAllFaces(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+
+        const attendeesIds = new Set(currentSession.attendees.map((a) => a.id));
+
+        for (const detection of detections) {
+          const bestMatch = faceMatcherRef.current.findBestMatch(detection.descriptor);
+          if (bestMatch.label !== 'unknown' && !attendeesIds.has(bestMatch.label)) {
+            addAttendee(bestMatch.label);
+          }
+        }
+      } catch (error) {
+        console.error('Error during face recognition:', error);
+      } finally {
+        isDetectingRef.current = false;
+        setIsDetecting(false);
+      }
+    }, 2000);
+
     return () => {
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-        }
-    }
-  }, [currentSession?.isActive, currentSession?.attendees, members, addAttendee]);
+      if (recognitionIntervalRef.current) clearInterval(recognitionIntervalRef.current);
+    };
+  }, [currentSession, hasCameraPermission, modelsLoaded, addAttendee]);
 
 
   const handleStartSession = () => {
@@ -90,6 +145,14 @@ export default function LiveSessionPage() {
         variant: 'destructive',
         title: 'Cannot Start Session',
         description: 'Camera access is required to start a live session.',
+      });
+      return;
+    }
+     if (!modelsLoaded) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot Start Session',
+        description: 'Recognition models are still loading.',
       });
       return;
     }
@@ -141,12 +204,26 @@ export default function LiveSessionPage() {
                         </Alert>
                     </div>
                 )}
+                
+                {hasCameraPermission && !modelsLoaded && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
+                    <Loader2 className="h-16 w-16 mx-auto animate-spin" />
+                    <p className="mt-4">Loading recognition models...</p>
+                  </div>
+                )}
 
-                {hasCameraPermission && !isSessionActive && (
+                {hasCameraPermission && modelsLoaded && !isSessionActive && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
                         <VideoOff className="h-16 w-16 mx-auto" />
                         <p className="mt-4">Session is not active. Start the session to begin attendance.</p>
                     </div>
+                )}
+
+                {isSessionActive && isDetecting && (
+                  <div className="absolute top-2 left-2 flex items-center gap-2 rounded-full bg-primary/80 px-3 py-1 text-xs text-primary-foreground backdrop-blur-sm">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Analyzing...</span>
+                  </div>
                 )}
               </div>
             </CardContent>

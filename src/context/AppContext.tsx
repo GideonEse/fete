@@ -12,6 +12,7 @@ export interface Member {
   memberType: 'student' | 'staff' | 'admin';
   avatar: string;
   facialImage?: string; // Data URI
+  faceDescriptor?: number[]; // For face-api.js
 }
 
 export interface Attendee extends Member {
@@ -126,7 +127,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const newMember: Member = {
       ...memberData,
       id: new Date().toISOString(),
-      avatar: `https://placehold.co/100x100.png`,
+      avatar: memberData.facialImage || `https://placehold.co/100x100.png`,
     };
     setMembers(prev => [...prev, newMember]);
     return { success: true, message: `Member ${newMember.name} registered successfully!` };
@@ -185,7 +186,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         status: isLate ? 'Late' : 'On-time',
       };
       
-      setCurrentSession(prev => prev ? { ...prev, attendees: [newAttendee, ...prev.attendees] } : null);
+      setCurrentSession(prev => prev ? { ...prev, attendees: [newAttendee, ...prev.attendees].sort((a,b) => b.time.localeCompare(a.time)) } : null);
   };
 
 
