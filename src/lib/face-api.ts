@@ -2,34 +2,23 @@ import * as faceapi from 'face-api.js';
 
 const MODEL_URL = 'https://unpkg.com/face-api.js@0.22.2/weights';
 
-let loadingPromise: Promise<void> | null = null;
-
-const loadAllModels = async () => {
+// Let components manage loading state. face-api.js handles not re-loading models.
+export const loadModels = async () => {
   try {
     await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
     await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
     await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
   } catch (error) {
-    console.error('Failed to load face-api models:', error);
-    // Reset promise on failure to allow retry on next call
-    loadingPromise = null;
-    // Rethrow to propagate the error to the caller
-    throw error;
+    console.error('Error loading face-api models:', error);
+    // Rethrow to allow components to handle the UI state
+    throw new Error('Failed to load face recognition models.');
   }
-};
-
-export const loadModels = (): Promise<void> => {
-  if (!loadingPromise) {
-    loadingPromise = loadAllModels();
-  }
-  return loadingPromise;
 };
 
 export const getFaceDescriptor = async (
   image: string
 ): Promise<Float32Array | undefined> => {
-  await loadModels(); // Ensure models are loaded before inference.
-
+  // It is the responsibility of the calling component to ensure models are loaded first.
   try {
     const img = await faceapi.fetchImage(image);
     const detection = await faceapi
