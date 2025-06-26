@@ -4,23 +4,24 @@ const MODEL_URL = 'https://unpkg.com/face-api.js@0.22.2/weights';
 
 let loadingPromise: Promise<void> | null = null;
 
-export const loadModels = async () => {
+export const loadModels = (): Promise<void> => {
   if (loadingPromise) {
     return loadingPromise;
   }
 
-  loadingPromise = (async () => {
+  loadingPromise = new Promise(async (resolve, reject) => {
     try {
       await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+      resolve();
     } catch (error) {
       console.error('Failed to load face-api models:', error);
-      loadingPromise = null; // Reset on failure to allow retry
-      throw error;
+      loadingPromise = null;
+      reject(error);
     }
-  })();
-  
+  });
+
   return loadingPromise;
 };
 
