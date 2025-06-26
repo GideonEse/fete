@@ -152,8 +152,6 @@ export default function LiveSessionPage() {
 
 
   const handleStartSession = () => {
-    const nonAdminMembersCount = members.filter(m => m.memberType !== 'admin').length;
-
     if (!hasCameraPermission) {
       toast({
         variant: 'destructive',
@@ -170,11 +168,25 @@ export default function LiveSessionPage() {
       });
       return;
     }
-    if (nonAdminMembersCount > 0 && !faceMatcherRef.current) {
+
+    const nonAdminMembersCount = members.filter(m => m.memberType !== 'admin').length;
+    const membersWithDescriptorsCount = members.filter(m => m.memberType !== 'admin' && m.faceDescriptor).length;
+
+    if (nonAdminMembersCount > 0 && membersWithDescriptorsCount === 0) {
         toast({
-            title: 'FYI: Recognition Not Ready',
-            description: 'No members have registered facial data. Recognition will not be active.',
+            variant: 'destructive',
+            title: 'Recognition Not Ready',
+            description: 'No members have registered facial data. Please register at least one member with a facial scan before starting a session.',
         });
+        return;
+    }
+    
+    if (nonAdminMembersCount > 0 && !faceMatcherRef.current) {
+      toast({
+        title: 'Recognition Initializing',
+        description: 'Face recognition engine is warming up. Please try again in a moment.',
+      });
+      return;
     }
 
     startSession();
