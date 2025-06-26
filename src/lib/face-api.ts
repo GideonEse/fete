@@ -1,6 +1,6 @@
 import * as faceapi from 'face-api.js';
 
-const MODEL_URL = 'https://unpkg.com/face-api.js@0.22.2/weights';
+const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
 
 // Let components manage loading state. face-api.js handles not re-loading models.
 export const loadModels = async () => {

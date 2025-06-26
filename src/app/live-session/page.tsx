@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Camera, Loader2, VideoOff } from 'lucide-react';
+import { AlertTriangle, Camera, Loader2, VideoOff } from 'lucide-react';
 import * as faceapi from 'face-api.js';
 
 import AppLayout from '@/components/AppLayout';
@@ -20,6 +20,7 @@ export default function LiveSessionPage() {
   const { members, currentSession, startSession, stopSession, addAttendee, isInitialized } = useApp();
   const [hasCameraPermission, setHasCameraPermission] = React.useState(false);
   const [modelsLoaded, setModelsLoaded] = React.useState(false);
+  const [modelError, setModelError] = React.useState<string | null>(null);
   const [isDetecting, setIsDetecting] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const recognitionIntervalRef = React.useRef<NodeJS.Timeout>();
@@ -50,6 +51,7 @@ export default function LiveSessionPage() {
         await loadModels();
         setModelsLoaded(true);
       } catch (error) {
+        setModelError('Could not load recognition models. Please refresh the page.');
         toast({
           variant: 'destructive',
           title: 'Model Loading Failed',
@@ -160,11 +162,11 @@ export default function LiveSessionPage() {
       });
       return;
     }
-     if (!modelsLoaded) {
+     if (modelError || !modelsLoaded) {
       toast({
         variant: 'destructive',
         title: 'Cannot Start Session',
-        description: 'Recognition models are still loading.',
+        description: modelError || 'Recognition models are still loading.',
       });
       return;
     }
@@ -224,7 +226,15 @@ export default function LiveSessionPage() {
                     </div>
                 )}
                 
-                {hasCameraPermission && !modelsLoaded && (
+                {modelError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/90 text-center text-destructive-foreground p-4">
+                    <AlertTriangle className="h-12 w-12 mx-auto" />
+                    <p className="mt-4 font-semibold">Model Loading Failed</p>
+                    <p className="mt-1 text-sm">{modelError}</p>
+                  </div>
+                )}
+
+                {!modelError && hasCameraPermission && !modelsLoaded && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
                     <Loader2 className="h-16 w-16 mx-auto animate-spin" />
                     <p className="mt-4">Loading recognition models...</p>

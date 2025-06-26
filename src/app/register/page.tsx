@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Camera, Loader2 } from 'lucide-react';
+import { AlertTriangle, Camera, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +30,7 @@ export default function RegisterPage() {
   const [memberType, setMemberType] = React.useState('');
   const [hasCameraPermission, setHasCameraPermission] = React.useState(false);
   const [modelsLoaded, setModelsLoaded] = React.useState(false);
+  const [modelError, setModelError] = React.useState<string | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
   const { toast } = useToast();
@@ -43,6 +44,7 @@ export default function RegisterPage() {
         await loadModels();
         setModelsLoaded(true);
       } catch (error) {
+        setModelError('Could not load recognition models. Facial registration is unavailable. Please refresh and try again.');
         toast({
           variant: 'destructive',
           title: 'Model Loading Failed',
@@ -270,7 +272,16 @@ export default function RegisterPage() {
                               </Alert>
                           </div>
                       )}
-                      {hasCameraPermission && !modelsLoaded && !capturedImage && (
+                      
+                      {modelError && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/90 text-center text-destructive-foreground p-4">
+                          <AlertTriangle className="h-12 w-12 mx-auto" />
+                          <p className="mt-4 font-semibold">Model Loading Failed</p>
+                          <p className="mt-1 text-sm">{modelError}</p>
+                        </div>
+                      )}
+
+                      {!modelError && hasCameraPermission && !modelsLoaded && !capturedImage && (
                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 text-center text-muted-foreground p-4">
                             <Loader2 className="h-12 w-12 mx-auto animate-spin" />
                             <p className="mt-2">Loading recognition models...</p>
