@@ -46,8 +46,16 @@ export default function LiveSessionPage() {
         });
       }
       
-      await loadModels();
-      setModelsLoaded(true);
+      try {
+        await loadModels();
+        setModelsLoaded(true);
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Model Loading Failed',
+          description: 'Could not load recognition models. Please refresh the page.',
+        });
+      }
     };
 
     setup();

@@ -39,8 +39,16 @@ export default function RegisterPage() {
 
   React.useEffect(() => {
     const initFaceApi = async () => {
-      await loadModels();
-      setModelsLoaded(true);
+      try {
+        await loadModels();
+        setModelsLoaded(true);
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Model Loading Failed',
+          description: 'Could not load recognition models. Please refresh the page.',
+        });
+      }
     };
 
     if (memberType === 'admin') {
@@ -202,7 +210,7 @@ export default function RegisterPage() {
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="name">{memberType === 'admin' ? 'Username' : 'Full Name'}</Label>
-                    <Input id="name" name="name" placeholder={memberType === 'admin' ? 'admin' : 'John Doe'} required />
+                    <Input id="name" name="name" placeholder={memberType === 'admin' ? 'Admin' : 'John Doe'} required />
                   </div>
                   {memberType !== 'admin' && (
                     <div>
