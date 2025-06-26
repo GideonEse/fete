@@ -87,7 +87,7 @@ export default function LiveSessionPage() {
             (member) =>
               new faceapi.LabeledFaceDescriptors(member.id, [new Float32Array(member.faceDescriptor)])
           );
-          faceMatcherRef.current = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.5);
+          faceMatcherRef.current = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
         } catch (error) {
             console.error("Failed to create FaceMatcher:", error);
             toast({
