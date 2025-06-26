@@ -152,6 +152,7 @@ export default function LiveSessionPage() {
 
 
   const handleStartSession = () => {
+    // Prerequisite checks
     if (!hasCameraPermission) {
       toast({
         variant: 'destructive',
@@ -160,7 +161,7 @@ export default function LiveSessionPage() {
       });
       return;
     }
-     if (modelError || !modelsLoaded) {
+    if (modelError || !modelsLoaded) {
       toast({
         variant: 'destructive',
         title: 'Cannot Start Session',
@@ -169,10 +170,21 @@ export default function LiveSessionPage() {
       return;
     }
 
-    const nonAdminMembersCount = members.filter(m => m.memberType !== 'admin').length;
-    const membersWithDescriptorsCount = members.filter(m => m.memberType !== 'admin' && m.faceDescriptor).length;
+    const nonAdminMembers = members.filter(m => m.memberType !== 'admin');
+    
+    // Check if there are any members to track
+    if (nonAdminMembers.length === 0) {
+      toast({
+        title: 'No Members to Track',
+        description: 'There are no registered student or staff members.',
+      });
+      return;
+    }
 
-    if (nonAdminMembersCount > 0 && membersWithDescriptorsCount === 0) {
+    const membersWithDescriptors = nonAdminMembers.filter(m => !!m.faceDescriptor && Array.isArray(m.faceDescriptor));
+
+    // Case 1: Members exist, but NONE have facial data. This is a hard stop.
+    if (membersWithDescriptors.length === 0) {
         toast({
             variant: 'destructive',
             title: 'Recognition Not Ready',
@@ -181,7 +193,8 @@ export default function LiveSessionPage() {
         return;
     }
     
-    if (nonAdminMembersCount > 0 && !faceMatcherRef.current) {
+    // Case 2: The face matcher is still being created from the descriptors. This is a temporary "warming up" state.
+    if (!faceMatcherRef.current) {
       toast({
         title: 'Recognition Initializing',
         description: 'Face recognition engine is warming up. Please try again in a moment.',
@@ -189,6 +202,7 @@ export default function LiveSessionPage() {
       return;
     }
 
+    // All checks passed, start the session.
     startSession();
   };
   
