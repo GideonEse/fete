@@ -17,7 +17,7 @@ import type { Member } from '@/context/AppContext';
 import { loadModels } from '@/lib/face-api';
 
 export default function LiveSessionPage() {
-  const { members, currentSession, startSession, stopSession, addAttendee, isInitialized } = useApp();
+  const { members, currentSession, startSession, startExitScan, endSession, addAttendee, isInitialized } = useApp();
   const [hasCameraPermission, setHasCameraPermission] = React.useState(false);
   const [modelsLoaded, setModelsLoaded] = React.useState(false);
   const [modelError, setModelError] = React.useState<string | null>(null);
@@ -28,7 +28,6 @@ export default function LiveSessionPage() {
   const faceMatcherRef = React.useRef<faceapi.FaceMatcher | null>(null);
   const { toast } = useToast();
   
-  // Get camera permission and load models
   React.useEffect(() => {
     const setup = async () => {
       try {
@@ -73,7 +72,6 @@ export default function LiveSessionPage() {
     };
   }, [toast]);
   
-  // Create face matcher when models are loaded or members change
   React.useEffect(() => {
     if (modelsLoaded && members.length > 0) {
       const membersWithDescriptors = members.filter(
@@ -102,7 +100,6 @@ export default function LiveSessionPage() {
     }
   }, [members, modelsLoaded, toast]);
   
-  // Facial recognition loop
   React.useEffect(() => {
     if (!currentSession?.isActive) {
       if (recognitionIntervalRef.current) clearInterval(recognitionIntervalRef.current);
@@ -128,13 +125,18 @@ export default function LiveSessionPage() {
           .detectAllFaces(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
           .withFaceLandmarks()
           .withFaceDescriptors();
-
-        const attendeesIds = new Set(currentSession.attendees.map((a) => a.id));
+        
+        const attendeesIdsInSession = new Set(currentSession.attendees.map((a) => a.id));
+        const attendeesWithExit = new Set(currentSession.attendees.filter(a => !!a.exitTime).map(a => a.id));
 
         for (const detection of detections) {
           const bestMatch = faceMatcherRef.current.findBestMatch(detection.descriptor);
-          if (bestMatch.label !== 'unknown' && !attendeesIds.has(bestMatch.label)) {
-            addAttendee(bestMatch.label);
+          if (bestMatch.label !== 'unknown') {
+              if (currentSession.mode === 'entry' && !attendeesIdsInSession.has(bestMatch.label)) {
+                  addAttendee(bestMatch.label);
+              } else if (currentSession.mode === 'exit' && attendeesIdsInSession.has(bestMatch.label) && !attendeesWithExit.has(bestMatch.label)) {
+                  addAttendee(bestMatch.label);
+              }
           }
         }
       } catch (error) {
@@ -152,57 +154,32 @@ export default function LiveSessionPage() {
 
 
   const handleStartSession = () => {
-    // Prerequisite checks
     if (!hasCameraPermission) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot Start Session',
-        description: 'Camera access is required to start a live session.',
-      });
+      toast({ variant: 'destructive', title: 'Cannot Start Session', description: 'Camera access is required.' });
       return;
     }
     if (modelError || !modelsLoaded) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot Start Session',
-        description: modelError || 'Recognition models are still loading.',
-      });
+      toast({ variant: 'destructive', title: 'Cannot Start Session', description: modelError || 'Recognition models are still loading.' });
       return;
     }
 
     const nonAdminMembers = members.filter(m => m.memberType !== 'admin');
-    
-    // Check if there are any members to track
     if (nonAdminMembers.length === 0) {
-      toast({
-        title: 'No Members to Track',
-        description: 'There are no registered student or staff members.',
-      });
+      toast({ title: 'No Members to Track', description: 'There are no registered student or staff members.' });
       return;
     }
 
     const membersWithDescriptors = nonAdminMembers.filter(m => !!m.faceDescriptor && Array.isArray(m.faceDescriptor));
-
-    // Case 1: Members exist, but NONE have facial data. This is a hard stop.
     if (membersWithDescriptors.length === 0) {
-        toast({
-            variant: 'destructive',
-            title: 'Recognition Not Ready',
-            description: 'No members have registered facial data. Please register at least one member with a facial scan before starting a session.',
-        });
+        toast({ variant: 'destructive', title: 'Recognition Not Ready', description: 'No members have registered facial data. Please register at least one member.' });
         return;
     }
     
-    // Case 2: The face matcher is still being created from the descriptors. This is a temporary "warming up" state.
     if (!faceMatcherRef.current) {
-      toast({
-        title: 'Recognition Initializing',
-        description: 'Face recognition engine is warming up. Please try again in a moment.',
-      });
+      toast({ title: 'Recognition Initializing', description: 'Face recognition engine is warming up. Please try again in a moment.' });
       return;
     }
 
-    // All checks passed, start the session.
     startSession();
   };
   
@@ -218,13 +195,41 @@ export default function LiveSessionPage() {
 
   const isSessionActive = currentSession?.isActive ?? false;
 
+  const getButtonProps = () => {
+    if (!isSessionActive) {
+      return {
+        label: 'Start Session',
+        action: handleStartSession,
+        variant: 'default' as const,
+        disabled: !hasCameraPermission || !modelsLoaded,
+      };
+    }
+    if (currentSession.mode === 'entry') {
+      return {
+        label: 'Start Exit Scan',
+        action: startExitScan,
+        variant: 'secondary' as const,
+        disabled: false,
+      };
+    }
+    // mode === 'exit'
+    return {
+      label: 'End Session',
+      action: endSession,
+      variant: 'destructive' as const,
+      disabled: false,
+    };
+  };
+
+  const { label, action, variant, disabled } = getButtonProps();
+  
   return (
     <AppLayout>
       <div className="flex-1 space-y-4 p-4 sm:p-8 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <h1 className="text-3xl font-bold tracking-tight font-headline">Live Attendance Session</h1>
-          <Button onClick={isSessionActive ? stopSession : handleStartSession} variant={isSessionActive ? 'destructive' : 'default'} disabled={!hasCameraPermission && !isSessionActive}>
-            {isSessionActive ? 'End Session' : 'Start Session'}
+          <Button onClick={action} variant={variant} disabled={disabled}>
+            {label}
           </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
@@ -232,7 +237,7 @@ export default function LiveSessionPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Camera className="h-6 w-6" />
-                Live Camera Feed
+                 {isSessionActive && currentSession?.mode === 'exit' ? 'Live Exit Scan' : 'Live Camera Feed'}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -277,7 +282,7 @@ export default function LiveSessionPage() {
                 {isSessionActive && isDetecting && (
                   <div className="absolute top-2 left-2 flex items-center gap-2 rounded-full bg-primary/80 px-3 py-1 text-xs text-primary-foreground backdrop-blur-sm">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>Analyzing...</span>
+                    <span>{currentSession?.mode === 'exit' ? 'Scanning for Exit...' : 'Scanning for Entry...'}</span>
                   </div>
                 )}
               </div>
@@ -304,7 +309,9 @@ export default function LiveSessionPage() {
                     </Avatar>
                     <div className="flex-1">
                       <p className="font-medium">{attendee.name}</p>
-                      <p className="text-sm text-muted-foreground">{attendee.time}</p>
+                      <p className="text-sm text-muted-foreground">
+                        In: {attendee.time} {attendee.exitTime && `| Out: ${attendee.exitTime}`}
+                      </p>
                     </div>
                     <Badge variant={attendee.status === 'On-time' ? 'secondary' : 'destructive'}>
                       {attendee.status}

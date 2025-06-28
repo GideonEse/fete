@@ -18,6 +18,7 @@ export interface Member {
 export interface Attendee extends Member {
   time: string;
   status: 'On-time' | 'Late';
+  exitTime?: string;
 }
 
 export interface Session {
@@ -25,6 +26,7 @@ export interface Session {
   isActive: boolean;
   startTime: number;
   attendees: Attendee[];
+  mode: 'entry' | 'exit';
 }
 
 interface AppContextType {
@@ -36,7 +38,8 @@ interface AppContextType {
   currentSession: Session | null;
   sessionHistory: Session[];
   startSession: () => void;
-  stopSession: () => void;
+  startExitScan: () => void;
+  endSession: () => void;
   addAttendee: (memberId: string) => void;
   isInitialized: boolean;
 }
@@ -61,9 +64,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
   
-  // We no longer load from localStorage, but we'll keep this effect
-  // to set `isInitialized` to true after the initial client-side render.
-  // This prevents hydration errors on pages that use `isInitialized`.
   useEffect(() => {
     setIsInitialized(true);
   }, []);
@@ -114,10 +114,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       isActive: true,
       startTime: Date.now(),
       attendees: [],
+      mode: 'entry',
     });
   };
 
-  const stopSession = () => {
+  const startExitScan = () => {
+    setCurrentSession(prev => prev ? { ...prev, mode: 'exit' } : null);
+  };
+
+  const endSession = () => {
     if (currentSession) {
       const finishedSession = { ...currentSession, isActive: false };
       setSessionHistory(prev => [finishedSession, ...prev]);
@@ -126,9 +131,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const addAttendee = (memberId: string) => {
+      if (!currentSession || !currentSession.isActive) return;
+      
       const member = members.find(m => m.id === memberId);
-      if (!member || !currentSession || !currentSession.isActive) return;
+      if (!member) return;
+      
+      // Handle exit scan
+      if (currentSession.mode === 'exit') {
+        setCurrentSession(prev => {
+          if (!prev) return null;
+          const now = new Date();
+          const exitTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          const updatedAttendees = prev.attendees.map(a => {
+            if (a.id === memberId && !a.exitTime) {
+              return { ...a, exitTime: exitTime };
+            }
+            return a;
+          });
 
+          // Only update state if a change was actually made
+          if (JSON.stringify(updatedAttendees) !== JSON.stringify(prev.attendees)) {
+              return { ...prev, attendees: updatedAttendees };
+          }
+          return prev;
+        });
+        return;
+      }
+      
+      // Handle entry scan
       const alreadyExists = currentSession.attendees.some(a => a.id === memberId);
       if(alreadyExists) return;
 
@@ -148,7 +179,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AppContext.Provider value={{ members, addMember, loggedInUser, login, logout, currentSession, sessionHistory, startSession, stopSession, addAttendee, isInitialized }}>
+    <AppContext.Provider value={{ members, addMember, loggedInUser, login, logout, currentSession, sessionHistory, startSession, startExitScan, endSession, addAttendee, isInitialized }}>
       {children}
     </AppContext.Provider>
   );

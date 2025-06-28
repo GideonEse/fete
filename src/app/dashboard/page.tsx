@@ -65,7 +65,7 @@ export default function DashboardPage() {
     event.preventDefault();
 
     const attendanceDataString = currentSession?.attendees
-        .map(a => `${a.name}, ${a.time}`)
+        .map(a => `${a.name}, Arrival: ${a.time}, Status: ${a.status}, Exit: ${a.exitTime ?? 'N/A'}`)
         .join('\n') ?? '';
     
     if (!attendanceDataString) {
@@ -198,14 +198,15 @@ export default function DashboardPage() {
           <Card className="col-span-4 lg:col-span-3">
             <CardHeader>
               <CardTitle className="font-headline">Recent Activity</CardTitle>
-              <CardDescription>An overview of the latest check-ins.</CardDescription>
+              <CardDescription>An overview of the latest check-ins and check-outs.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
-                    <TableHead>Arrival Time</TableHead>
+                    <TableHead>Arrival</TableHead>
+                    <TableHead>Exit</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -214,6 +215,7 @@ export default function DashboardPage() {
                     <TableRow key={activity.id}>
                       <TableCell className="font-medium">{activity.name}</TableCell>
                       <TableCell>{activity.time}</TableCell>
+                      <TableCell>{activity.exitTime ?? '-'}</TableCell>
                       <TableCell>
                         <Badge variant={activity.status === 'On-time' ? 'secondary' : 'destructive'}>
                           {activity.status}
@@ -223,7 +225,7 @@ export default function DashboardPage() {
                   ))}
                    {recentActivity.length === 0 && (
                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground">No activity yet for this session.</TableCell>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">No activity yet for this session.</TableCell>
                      </TableRow>
                    )}
                 </TableBody>
@@ -241,7 +243,7 @@ export default function DashboardPage() {
             <form onSubmit={handleAnalysis} className="space-y-4">
               <Textarea
                 name="query"
-                placeholder="e.g., 'Who arrived earliest?' or 'List all members who were late.'"
+                placeholder="e.g., 'Who arrived earliest?' or 'List all members who were late and their exit times.'"
                 className="min-h-[100px]"
               />
               <Button type="submit" disabled={isLoadingAnalysis}>
