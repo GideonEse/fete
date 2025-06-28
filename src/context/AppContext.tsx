@@ -14,7 +14,13 @@ export interface Member {
   faceDescriptor?: number[]; // For face-api.js
 }
 
-export interface Attendee extends Member {
+// This Attendee type is for the LIVE session and history. Avatar is optional.
+export interface Attendee {
+  id: string;
+  name: string;
+  matricNumber?: string;
+  memberType: 'student' | 'staff';
+  avatar?: string; // Optional: present for live view, absent for history
   time: string;
   status: 'On-time' | 'Late';
   exitTime?: string;
@@ -75,11 +81,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       const storedHistory = localStorage.getItem('veriattend_sessionHistory');
       if (storedHistory) {
-        setSessionHistory(JSON.parse(storedHistory));
+        const loadedHistory: Session[] = JSON.parse(storedHistory);
+        // Proactively slim down any history we load to fix existing quota issues
+        const slimHistory = loadedHistory.map(session => {
+            const slimSession = { ...session };
+            slimSession.attendees = session.attendees.map(attendee => {
+                const { avatar, faceDescriptor, password, ...rest } = attendee as any;
+                return rest;
+            });
+            return slimSession;
+        });
+        setSessionHistory(slimHistory);
       }
     } catch (error) {
       console.error('Failed to load data from localStorage', error);
-      // If there's an error (e.g., parsing), start with initial state
       setMembers(initialMembers);
       setSessionHistory([]);
     }
@@ -100,7 +115,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('veriattend_sessionHistory', JSON.stringify(sessionHistory));
       } catch (error) {
         console.error("Failed to save session history to localStorage:", error);
-        // This could be a quota error. We might want to notify the user or try to slim down the data.
       }
     }
   }, [sessionHistory, isInitialized]);
@@ -164,14 +178,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const endSession = () => {
     if (currentSession) {
-      // Deep clone to avoid mutating state and prepare for slimming down.
-      const finishedSession = JSON.parse(JSON.stringify(currentSession));
+      const finishedSession: Session = JSON.parse(JSON.stringify(currentSession));
       finishedSession.isActive = false;
       
-      // Remove large data properties not needed for history to prevent quota errors.
-      finishedSession.attendees.forEach((attendee: any) => {
+      // Slim down for history by removing the optional avatar
+      finishedSession.attendees.forEach((attendee) => {
         delete attendee.avatar;
-        delete attendee.faceDescriptor;
       });
 
       setSessionHistory(prev => [finishedSession, ...prev]);
@@ -185,7 +197,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const member = members.find(m => m.id === memberId);
       if (!member) return;
       
-      // Handle exit scan
       if (currentSession.mode === 'exit') {
         setCurrentSession(prev => {
           if (!prev) return null;
@@ -199,7 +210,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             return a;
           });
 
-          // Only update state if a change was actually made
           if (JSON.stringify(updatedAttendees) !== JSON.stringify(prev.attendees)) {
               return { ...prev, attendees: updatedAttendees };
           }
@@ -208,17 +218,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // Handle entry scan
       const alreadyExists = currentSession.attendees.some(a => a.id === memberId);
       if(alreadyExists) return;
 
       const now = new Date();
       const arrivalTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      // Late if more than 15 mins past session start
       const isLate = (now.getTime() - currentSession.startTime) > (15 * 60 * 1000); 
 
+      // Create a new attendee object, including the avatar for the live view.
+      // This will be stripped out before saving to history.
       const newAttendee: Attendee = {
-        ...member,
+        id: member.id,
+        name: member.name,
+        matricNumber: member.matricNumber,
+        memberType: member.memberType as 'student' | 'staff',
+        avatar: member.avatar,
         time: arrivalTime,
         status: isLate ? 'Late' : 'On-time',
       };
