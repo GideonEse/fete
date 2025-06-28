@@ -11,7 +11,6 @@ export interface Member {
   password?: string;
   memberType: 'student' | 'staff' | 'admin';
   avatar: string;
-  facialImage?: string; // Data URI
   faceDescriptor?: number[]; // For face-api.js
 }
 
@@ -31,7 +30,7 @@ export interface Session {
 
 interface AppContextType {
   members: Member[];
-  addMember: (member: Omit<Member, 'id' | 'avatar'>) => { success: boolean, message: string };
+  addMember: (member: Omit<Member, 'id' | 'avatar'> & { facialImage?: string }) => { success: boolean, message: string };
   loggedInUser: Member | null;
   login: (identifier: string, password: string, memberType: string) => { success: boolean, message: string };
   logout: () => void;
@@ -57,7 +56,7 @@ const initialMembers: Member[] = [
 ];
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [members, setMembers] = useState<Member[]>([]);
   const [loggedInUser, setLoggedInUser] = useState<Member | null>(null);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionHistory, setSessionHistory] = useState<Session[]>([]);
@@ -97,12 +96,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Save session history to localStorage whenever it changes
   useEffect(() => {
     if (isInitialized) {
-      localStorage.setItem('veriattend_sessionHistory', JSON.stringify(sessionHistory));
+      try {
+        localStorage.setItem('veriattend_sessionHistory', JSON.stringify(sessionHistory));
+      } catch (error) {
+        console.error("Failed to save session history to localStorage:", error);
+        // This could be a quota error. We might want to notify the user or try to slim down the data.
+      }
     }
   }, [sessionHistory, isInitialized]);
   
 
-  const addMember = (memberData: Omit<Member, 'id' | 'avatar'>) => {
+  const addMember = (memberData: Omit<Member, 'id' | 'avatar'> & { facialImage?: string }) => {
     if (memberData.memberType !== 'admin') {
       const existingMember = members.find(m => m.matricNumber === memberData.matricNumber);
       if (existingMember) {
@@ -115,10 +119,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
+    const { facialImage, ...restOfData } = memberData;
+
     const newMember: Member = {
-      ...memberData,
+      ...(restOfData as Omit<Member, 'id' | 'avatar'>),
       id: new Date().toISOString(),
-      avatar: memberData.facialImage || `https://placehold.co/100x100.png`,
+      avatar: facialImage || `https://placehold.co/100x100.png`,
     };
     setMembers(prev => [...prev, newMember]);
     return { success: true, message: `Member ${newMember.name} registered successfully!` };
@@ -158,7 +164,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const endSession = () => {
     if (currentSession) {
-      const finishedSession = { ...currentSession, isActive: false };
+      // Deep clone to avoid mutating state and prepare for slimming down.
+      const finishedSession = JSON.parse(JSON.stringify(currentSession));
+      finishedSession.isActive = false;
+      
+      // Remove large data properties not needed for history to prevent quota errors.
+      finishedSession.attendees.forEach((attendee: any) => {
+        delete attendee.avatar;
+        delete attendee.faceDescriptor;
+      });
+
       setSessionHistory(prev => [finishedSession, ...prev]);
       setCurrentSession(null);
     }
