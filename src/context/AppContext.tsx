@@ -63,10 +63,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [sessionHistory, setSessionHistory] = useState<Session[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
-  
+
+  // Load state from localStorage on initial render
   useEffect(() => {
+    try {
+      const storedMembers = localStorage.getItem('veriattend_members');
+      if (storedMembers) {
+        setMembers(JSON.parse(storedMembers));
+      } else {
+        setMembers(initialMembers);
+      }
+
+      const storedHistory = localStorage.getItem('veriattend_sessionHistory');
+      if (storedHistory) {
+        setSessionHistory(JSON.parse(storedHistory));
+      }
+    } catch (error) {
+      console.error('Failed to load data from localStorage', error);
+      // If there's an error (e.g., parsing), start with initial state
+      setMembers(initialMembers);
+      setSessionHistory([]);
+    }
     setIsInitialized(true);
   }, []);
+
+  // Save members to localStorage whenever they change
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('veriattend_members', JSON.stringify(members));
+    }
+  }, [members, isInitialized]);
+
+  // Save session history to localStorage whenever it changes
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('veriattend_sessionHistory', JSON.stringify(sessionHistory));
+    }
+  }, [sessionHistory, isInitialized]);
+  
 
   const addMember = (memberData: Omit<Member, 'id' | 'avatar'>) => {
     if (memberData.memberType !== 'admin') {
