@@ -59,7 +59,7 @@ export default function DashboardPage() {
         const average = monthData.length > 0
             ? monthData.reduce((a, b) => a + b, 0) / monthData.length
             : 0;
-        return { name, total: Math.round(average) };
+        return { name, total: parseFloat(average.toFixed(1)) };
     });
   }, [sessionHistory, members]);
 
@@ -178,7 +178,8 @@ export default function DashboardPage() {
   const presentCount = currentSession?.attendees?.length ?? 0;
   const lateCount = currentSession?.attendees?.filter(a => a.status === 'Late').length ?? 0;
   const totalMembers = members.filter(m => m.memberType !== 'admin').length;
-  const recentActivity = currentSession?.attendees.slice(0, 4) ?? [];
+  const latestSessionAttendees = currentSession?.attendees ?? sessionHistory?.[0]?.attendees ?? [];
+  const recentActivity = latestSessionAttendees.slice(0, 5);
 
   return (
     <AppLayout>
@@ -250,6 +251,7 @@ export default function DashboardPage() {
           <Card className="col-span-4">
             <CardHeader>
               <CardTitle className="font-headline">Attendance Overview</CardTitle>
+              <CardDescription>Average monthly attendance percentage.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
               <ResponsiveContainer width="100%" height={350}>
@@ -291,7 +293,7 @@ export default function DashboardPage() {
                   ))}
                    {recentActivity.length === 0 && (
                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">No activity yet for this session.</TableCell>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">No recent activity found.</TableCell>
                      </TableRow>
                    )}
                 </TableBody>
