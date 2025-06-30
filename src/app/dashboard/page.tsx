@@ -6,10 +6,12 @@ import {
   BarChart,
   CheckCircle2,
   Clock,
+  FileSpreadsheet,
   Loader2,
   Users,
 } from 'lucide-react';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import * as XLSX from 'xlsx';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -105,6 +107,64 @@ export default function DashboardPage() {
     }
   };
 
+  const handleExport = () => {
+    const latestSession = sessionHistory?.[0];
+    if (!latestSession) {
+      toast({
+        variant: 'destructive',
+        title: 'No Data to Export',
+        description: 'There are no completed sessions in the history to export.',
+      });
+      return;
+    }
+
+    const allMembers = members.filter(m => m.memberType !== 'admin');
+    const attendeesMap = new Map(latestSession.attendees.map(a => [a.id, a]));
+
+    const exportData = allMembers.map(member => {
+      const attendanceRecord = attendeesMap.get(member.id);
+      if (attendanceRecord) {
+        return {
+          'Name': member.name,
+          'Matric Number': member.matricNumber || 'N/A',
+          'Status': 'Present',
+          'Arrival Time': attendanceRecord.time,
+          'Exit Time': attendanceRecord.exitTime || 'N/A',
+        };
+      } else {
+        return {
+          'Name': member.name,
+          'Matric Number': member.matricNumber || 'N/A',
+          'Status': 'Absent',
+          'Arrival Time': 'N/A',
+          'Exit Time': 'N/A',
+        };
+      }
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Report");
+
+    // Set column widths for better readability
+    const columnWidths = [
+        { wch: 25 }, // Name
+        { wch: 15 }, // Matric Number
+        { wch: 10 }, // Status
+        { wch: 15 }, // Arrival Time
+        { wch: 15 }, // Exit Time
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    const sessionDate = new Date(latestSession.startTime).toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `VeriAttend_Attendance_${sessionDate}.xlsx`);
+
+    toast({
+        title: 'Export Successful',
+        description: 'The attendance report has been downloaded.',
+    });
+  };
+
   if (!isInitialized) {
     return (
       <AppLayout>
@@ -133,6 +193,12 @@ export default function DashboardPage() {
               <h1 className="text-3xl font-bold tracking-tight font-headline">Admin Dashboard</h1>
               <p className="text-muted-foreground">Welcome back, {loggedInUser?.name}!</p>
             </div>
+          </div>
+           <div className="flex items-center space-x-2">
+            <Button onClick={handleExport}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Export Latest Report
+            </Button>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
