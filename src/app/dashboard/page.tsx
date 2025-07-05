@@ -3,7 +3,6 @@
 import * as React from 'react';
 import Link from 'next/link';
 import {
-  BarChart,
   PieChart,
   UserX,
   Loader2,
@@ -20,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import AppLayout from '@/components/AppLayout';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
+import type { Session } from '@/context/AppContext';
 
 export default function DashboardPage() {
   const { loggedInUser, members, currentSession, sessionHistory, isInitialized } = useApp();
@@ -77,9 +76,8 @@ export default function DashboardPage() {
     });
   }, [sessionHistory, totalMembers]);
 
-  const handleExport = () => {
-    const latestSession = sessionHistory?.[0];
-    if (!latestSession) {
+  const handleExport = (sessionToExport: Session | undefined) => {
+    if (!sessionToExport) {
       toast({
         variant: 'destructive',
         title: 'No Data to Export',
@@ -89,7 +87,7 @@ export default function DashboardPage() {
     }
 
     const allMembers = members.filter(m => m.memberType !== 'admin');
-    const attendeesMap = new Map(latestSession.attendees.map(a => [a.id, a]));
+    const attendeesMap = new Map(sessionToExport.attendees.map(a => [a.id, a]));
 
     const exportData = allMembers.map(member => {
       const attendanceRecord = attendeesMap.get(member.id);
@@ -125,7 +123,7 @@ export default function DashboardPage() {
     ];
     worksheet['!cols'] = columnWidths;
 
-    const sessionDate = new Date(latestSession.startTime).toISOString().split('T')[0];
+    const sessionDate = new Date(sessionToExport.startTime).toISOString().split('T')[0];
     XLSX.writeFile(workbook, `VeriAttend_Attendance_${sessionDate}.xlsx`);
 
     toast({
@@ -143,9 +141,6 @@ export default function DashboardPage() {
       </AppLayout>
     );
   }
-  
-  const latestSessionAttendees = currentSession?.attendees ?? sessionHistory?.[0]?.attendees ?? [];
-  const recentActivity = latestSessionAttendees.slice(0, 5);
 
   return (
     <AppLayout>
@@ -162,7 +157,7 @@ export default function DashboardPage() {
             </div>
           </div>
            <div className="flex items-center space-x-2">
-            <Button onClick={handleExport}>
+            <Button onClick={() => handleExport(sessionHistory?.[0])}>
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Export Latest Report
             </Button>
@@ -231,35 +226,40 @@ export default function DashboardPage() {
           </Card>
           <Card className="col-span-4 lg:col-span-3">
             <CardHeader>
-              <CardTitle className="font-headline">Recent Activity</CardTitle>
-              <CardDescription>An overview of the latest check-ins and check-outs.</CardDescription>
+              <CardTitle className="font-headline">Session History</CardTitle>
+              <CardDescription>A log of your 5 most recent sessions.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Arrival</TableHead>
-                    <TableHead>Exit</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Present</TableHead>
+                    <TableHead>Absent</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentActivity.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell className="font-medium">{activity.name}</TableCell>
-                      <TableCell>{activity.time}</TableCell>
-                      <TableCell>{activity.exitTime ?? '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant={activity.status === 'On-time' ? 'secondary' : 'destructive'}>
-                          {activity.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                   {recentActivity.length === 0 && (
+                  {sessionHistory.length > 0 ? (
+                    sessionHistory.slice(0, 5).map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell>{new Date(session.startTime).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <span className="font-medium text-primary">{session.attendees.length}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium text-destructive">{totalMembers - session.attendees.length}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => handleExport(session)}>
+                            Export
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">No recent activity found.</TableCell>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">No session history found.</TableCell>
                      </TableRow>
                    )}
                 </TableBody>
