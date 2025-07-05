@@ -4,11 +4,11 @@ import * as React from 'react';
 import Link from 'next/link';
 import {
   BarChart,
-  CheckCircle2,
-  Clock,
-  FileSpreadsheet,
+  PieChart,
+  UserX,
   Loader2,
   Users,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -17,23 +17,37 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/components/AppLayout';
-import { getAttendanceAnalysis } from '@/lib/actions';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const { loggedInUser, members, currentSession, sessionHistory, isInitialized } = useApp();
-  const [analysisResult, setAnalysisResult] = React.useState('');
-  const [isLoadingAnalysis, setIsLoadingAnalysis] = React.useState(false);
   const { toast } = useToast();
 
-  const chartData = React.useMemo(() => {
-    const nonAdminMembers = members.filter(m => m.memberType !== 'admin');
-    const totalMembers = nonAdminMembers.length;
+  const nonAdminMembers = React.useMemo(() => members.filter(m => m.memberType !== 'admin'), [members]);
+  const totalMembers = nonAdminMembers.length;
 
+  const dashboardStats = React.useMemo(() => {
+    const totalSessions = sessionHistory.length;
+    if (totalMembers === 0 || totalSessions === 0) {
+      return { averageAttendance: 0, totalAbsences: 0 };
+    }
+
+    const totalPossibleAttendances = totalMembers * totalSessions;
+    const totalActualAttendances = sessionHistory.reduce((sum, session) => sum + session.attendees.length, 0);
+
+    const averageAttendance = totalPossibleAttendances > 0 
+      ? Math.round((totalActualAttendances / totalPossibleAttendances) * 100) 
+      : 0;
+      
+    const totalAbsences = totalPossibleAttendances - totalActualAttendances;
+
+    return { averageAttendance, totalAbsences };
+  }, [sessionHistory, totalMembers]);
+
+  const chartData = React.useMemo(() => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const defaultChartData = monthNames.map(name => ({ name, total: 0 }));
 
@@ -61,51 +75,7 @@ export default function DashboardPage() {
             : 0;
         return { name, total: parseFloat(average.toFixed(1)) };
     });
-  }, [sessionHistory, members]);
-
-  const handleAnalysis = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const attendanceDataString = currentSession?.attendees
-        .map(a => `${a.name}, Arrival: ${a.time}, Status: ${a.status}, Exit: ${a.exitTime ?? 'N/A'}`)
-        .join('\n') ?? '';
-    
-    if (!attendanceDataString) {
-        toast({
-            variant: 'destructive',
-            title: 'No Data',
-            description: 'There is no attendance data from the current session to analyze.',
-        });
-        return;
-    }
-
-    const formData = new FormData(event.currentTarget);
-    const query = formData.get('query') as string;
-
-    if (!query) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Please enter a query for analysis.',
-      });
-      return;
-    }
-
-    setIsLoadingAnalysis(true);
-    setAnalysisResult('');
-    try {
-      const result = await getAttendanceAnalysis(query, attendanceDataString);
-      setAnalysisResult(result.analysis);
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Analysis Failed',
-        description: 'Could not analyze attendance data.',
-      });
-    } finally {
-      setIsLoadingAnalysis(false);
-    }
-  };
+  }, [sessionHistory, totalMembers]);
 
   const handleExport = () => {
     const latestSession = sessionHistory?.[0];
@@ -146,13 +116,12 @@ export default function DashboardPage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Report");
 
-    // Set column widths for better readability
     const columnWidths = [
-        { wch: 25 }, // Name
-        { wch: 15 }, // Matric Number
-        { wch: 10 }, // Status
-        { wch: 15 }, // Arrival Time
-        { wch: 15 }, // Exit Time
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 10 },
+        { wch: 15 },
+        { wch: 15 },
     ];
     worksheet['!cols'] = columnWidths;
 
@@ -175,9 +144,6 @@ export default function DashboardPage() {
     );
   }
   
-  const presentCount = currentSession?.attendees?.length ?? 0;
-  const lateCount = currentSession?.attendees?.filter(a => a.status === 'Late').length ?? 0;
-  const totalMembers = members.filter(m => m.memberType !== 'admin').length;
   const latestSessionAttendees = currentSession?.attendees ?? sessionHistory?.[0]?.attendees ?? [];
   const recentActivity = latestSessionAttendees.slice(0, 5);
 
@@ -214,20 +180,20 @@ export default function DashboardPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Average Attendance</CardTitle>
+              <PieChart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{presentCount}</div>
+              <div className="text-2xl font-bold">{dashboardStats.averageAttendance}%</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Latecomers</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Absences</CardTitle>
+              <UserX className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{lateCount}</div>
+              <div className="text-2xl font-bold">{dashboardStats.totalAbsences}</div>
             </CardContent>
           </Card>
           <Card className="lg:col-span-1 bg-primary text-primary-foreground">
@@ -301,32 +267,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">AI Attendance Analysis</CardTitle>
-            <CardDescription>Ask questions about the current session's attendance data to get insights.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAnalysis} className="space-y-4">
-              <Textarea
-                name="query"
-                placeholder="e.g., 'Who arrived earliest?' or 'List all members who were late and their exit times.'"
-                className="min-h-[100px]"
-              />
-              <Button type="submit" disabled={isLoadingAnalysis}>
-                {isLoadingAnalysis && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Analyze Data
-              </Button>
-            </form>
-            {analysisResult && (
-              <div className="mt-4 rounded-lg border bg-secondary/50 p-4">
-                <h4 className="font-semibold mb-2">Analysis Result:</h4>
-                <p className="text-sm text-foreground/80 whitespace-pre-wrap">{analysisResult}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </AppLayout>
   );
